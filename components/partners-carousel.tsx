@@ -7,6 +7,7 @@ const partners = [
     "https://res.cloudinary.com/doyjag1gz/image/upload/v1763647365/6_eovfmr.png",
     "https://res.cloudinary.com/doyjag1gz/image/upload/v1763650100/3-min_garwo1.png",
     "https://res.cloudinary.com/doyjag1gz/image/upload/v1763650099/2-min_rnrxw8.png",
+    "https://res.cloudinary.com/doyjag1gz/image/upload/v1763676212/Untitled_design_3_woynzu.png",
     "https://res.cloudinary.com/doyjag1gz/image/upload/v1763647361/1_f2a1lu.png",
 ]
 

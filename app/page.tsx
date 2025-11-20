@@ -53,7 +53,7 @@ export default function Home() {
               alt="MPS Media Poetry Logo"
               className="w-10 h-10 rounded-lg object-cover"
             />
-            <h1 className="text-xl sm:text-2xl font-bold text-white">MPS Media Poetry</h1>
+            <h1 className="text-lg  md:text-2xl font-bold text-white">MPS Poetry Challange </h1>
           </div>
           {/* Mobile Menu Button */}
           <div className="sm:hidden">
