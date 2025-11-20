@@ -1,0 +1,106 @@
+import { NextResponse } from "next/server"
+import { z } from "zod"
+
+import { connectToDatabase, TeamModel } from "@/lib/mongodb"
+
+const coachSchema = z.object({
+  name: z.string().min(1, "Coach name is required"),
+  email: z
+    .string()
+    .email("Coach email must be valid")
+    .optional()
+    .or(z.literal("")),
+  phone: z.string().optional().or(z.literal("")),
+  image: z.string().url("Coach image must be a valid URL").optional().or(z.literal("")),
+})
+
+const participantSchema = z.object({
+  name: z.string().min(1, "Participant name is required"),
+  image: z.string().url("Participant image must be a valid URL").optional().or(z.literal("")),
+  votes: z.number().int().nonnegative().optional().default(0),
+})
+
+const teamSchema = z.object({
+  name: z.string().min(1, "Team name is required"),
+  color: z.string().min(1, "Team color is required"),
+  coach: coachSchema,
+  participants: z.array(participantSchema).optional(),
+})
+
+function normalizeString(value?: string | null) {
+  if (!value) return undefined
+  const trimmed = value.trim()
+  return trimmed.length ? trimmed : undefined
+}
+
+function serializeTeam(team: any) {
+  return {
+    id: team._id.toString(),
+    name: team.name,
+    color: team.color,
+    coach: team.coach,
+    participants: (team.participants || []).map((participant: any) => ({
+      id: participant._id.toString(),
+      name: participant.name,
+      image: participant.image,
+      votes: participant.votes ?? 0,
+      teamId: team._id.toString(),
+      createdAt: participant.createdAt?.toISOString?.() ?? participant.createdAt,
+      updatedAt: participant.updatedAt?.toISOString?.() ?? participant.updatedAt,
+    })),
+    createdAt: team.createdAt?.toISOString?.() ?? team.createdAt,
+    updatedAt: team.updatedAt?.toISOString?.() ?? team.updatedAt,
+  }
+}
+
+export async function GET() {
+  try {
+    await connectToDatabase()
+    const teams = await TeamModel.find().sort({ createdAt: -1 }).lean()
+
+    return NextResponse.json({ teams: teams.map(serializeTeam) })
+  } catch (error) {
+    console.error("[GET_TEAMS_ERROR]", error)
+    return NextResponse.json({ error: "Failed to fetch teams" }, { status: 500 })
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const payload = await request.json()
+    const parsed = teamSchema.safeParse(payload)
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+    }
+
+    await connectToDatabase()
+
+    const participants = (parsed.data.participants || []).map((participant) => ({
+      name: participant.name.trim(),
+      image: normalizeString(participant.image),
+      votes: participant.votes ?? 0,
+    }))
+    const coach = {
+      name: parsed.data.coach.name.trim(),
+      email: normalizeString(parsed.data.coach.email),
+      phone: normalizeString(parsed.data.coach.phone),
+      image: normalizeString(parsed.data.coach.image),
+    }
+
+    const document = {
+      name: parsed.data.name.trim(),
+      color: parsed.data.color.trim(),
+      coach,
+      participants,
+    }
+
+    const createdTeam = await TeamModel.create(document)
+
+    return NextResponse.json({ team: serializeTeam(createdTeam.toObject()) }, { status: 201 })
+  } catch (error) {
+    console.error("[CREATE_TEAM_ERROR]", error)
+    return NextResponse.json({ error: "Failed to create team" }, { status: 500 })
+  }
+}
+
