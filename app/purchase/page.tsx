@@ -68,8 +68,8 @@ export default function PurchasePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
             <ArrowLeft className="w-5 h-5" />
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              MPS Poetry Challenge
+            <h1 className="text-md md:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              MPS Media Poetry Challenge
             </h1>
           </Link>
         </div>
