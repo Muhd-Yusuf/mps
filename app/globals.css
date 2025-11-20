@@ -76,7 +76,7 @@
 }
 
 @theme inline {
-  --font-sans: "Comic Relief", "Geist Fallback";
+  --font-sans: var(--font-quicksand), "Geist Fallback";
   --font-mono: "Geist Mono", "Geist Mono Fallback";
   --font-rubik-marker-hatch: "Rubik Marker Hatch", "Geist Fallback";
   --color-background: var(--background);
@@ -121,6 +121,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -132,6 +133,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -143,6 +145,7 @@
     opacity: 0;
     transform: translateX(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -150,10 +153,12 @@
 }
 
 @keyframes pulse-glow {
+
   0%,
   100% {
     box-shadow: 0 0 0 0 rgba(101, 84, 192, 0.4);
   }
+
   50% {
     box-shadow: 0 0 0 10px rgba(101, 84, 192, 0);
   }
@@ -175,6 +180,7 @@
   0% {
     transform: translateX(0);
   }
+
   100% {
     transform: translateX(-50%);
   }

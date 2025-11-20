@@ -1,15 +1,14 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Comic_Relief, Rubik_Marker_Hatch } from "next/font/google"
+import { Quicksand, Rubik_Marker_Hatch } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/components/auth-provider"
 import { Toaster } from "sonner"
 import "./globals.css"
 
-const comicRelief = Comic_Relief({
-  weight: "400",
+const quicksand = Quicksand({
   subsets: ["latin"],
-  variable: "--font-sans",
+  variable: "--font-quicksand",
 })
 const rubikMarkerHatch = Rubik_Marker_Hatch({
   weight: "400",
@@ -34,7 +33,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`font-sans antialiased ${comicRelief.variable} ${rubikMarkerHatch.variable}`}>
+      <body className={`font-sans antialiased ${quicksand.variable} ${rubikMarkerHatch.variable}`}>
         <AuthProvider>
           {children}
         </AuthProvider>
