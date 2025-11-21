@@ -51,7 +51,7 @@ export default function Home() {
         <img
           src="https://res.cloudinary.com/doyjag1gz/image/upload/v1763647363/4_chleoz.png"
           alt="Loading..."
-          className="w-24 h-24 md:w-32 md:h-32 animate-pulse object-contain"
+          className="w-20 h-20 md:w-32 md:h-32 animate-pulse object-contain"
         />
       </div>
     )
