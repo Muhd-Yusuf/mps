@@ -11,22 +11,30 @@ export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [stage, setStage] = useState("Discover Exceptional Talent")
   const [isScrolled, setIsScrolled] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const fetchStage = async () => {
-      try {
-        const response = await fetch("/api/settings/stage")
-        if (response.ok) {
-          const data = await response.json()
-          if (data.stage && data.stage !== "Not Set") {
-            setStage(data.stage)
+    const init = async () => {
+      // Wait for both the fetch and a minimum delay to show the animation
+      const minLoaderTime = new Promise((resolve) => setTimeout(resolve, 2000))
+      const fetchPromise = (async () => {
+        try {
+          const response = await fetch("/api/settings/stage")
+          if (response.ok) {
+            const data = await response.json()
+            if (data.stage && data.stage !== "Not Set") {
+              setStage(data.stage)
+            }
           }
+        } catch (error) {
+          console.error("Failed to fetch stage:", error)
         }
-      } catch (error) {
-        console.error("Failed to fetch stage:", error)
-      }
+      })()
+
+      await Promise.all([minLoaderTime, fetchPromise])
+      setIsLoading(false)
     }
-    fetchStage()
+    init()
   }, [])
 
   useEffect(() => {
@@ -36,6 +44,18 @@ export default function Home() {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">
+        <img
+          src="https://res.cloudinary.com/doyjag1gz/image/upload/v1763647363/4_chleoz.png"
+          alt="Loading..."
+          className="w-24 h-24 md:w-32 md:h-32 animate-pulse object-contain"
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
@@ -91,7 +111,6 @@ export default function Home() {
                 Leaderboard
               </Button>
             </Link>
-
           </div>
         </div>
         {/* Mobile Menu */}
@@ -120,7 +139,6 @@ export default function Home() {
                   Leaderboard
                 </Button>
               </Link>
-
             </div>
           </div>
         )}
