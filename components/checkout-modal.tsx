@@ -82,7 +82,7 @@ export default function CheckoutModal({ email, selections, onClose }: CheckoutMo
             <h4 className="font-semibold text-foreground mb-4">Order Summary</h4>
             <div className="space-y-3 text-sm text-muted-foreground">
               <div className="flex justify-between">
-                <span>Voting Ticket (5 teams)</span>
+                <span>Voting Code (5 teams)</span>
                 <span className="font-medium text-foreground">₦2,000.00</span>
               </div>
               <div className="border-t border-primary/20 pt-3 mt-3 flex justify-between font-semibold text-foreground">

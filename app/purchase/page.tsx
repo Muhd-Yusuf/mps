@@ -77,7 +77,7 @@ export default function PurchasePage() {
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8 animate-fade-in-up">
-          <h2 className="text-3xl font-extrabold text-foreground mb-3">GET YOUR VOTING TICKET</h2>
+          <h2 className="text-3xl font-extrabold text-foreground mb-3">GET YOUR VOTING CODE</h2>
           <p className="text-muted-foreground text-lg">Purchase a ticket to receive your unique voting code</p>
         </div>
 

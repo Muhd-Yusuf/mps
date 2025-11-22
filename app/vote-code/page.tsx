@@ -57,7 +57,7 @@ export default function VoteCodePage() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8 animate-fade-in-up">
           <h2 className="text-4xl font-bold text-foreground mb-3">Enter Your Voting Code</h2>
-          <p className="text-muted-foreground text-lg">You received this code when you purchased your voting ticket</p>
+          <p className="text-muted-foreground text-lg">You received this code when you purchased your voting code</p>
         </div>
 
         <Card className="bg-card/50 border-border/40 backdrop-blur shadow-2xl">

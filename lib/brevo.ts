@@ -67,7 +67,7 @@ export function createVotingCodeEmailTemplate(votingCode: string, appUrl?: strin
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px 12px 0 0;">
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">MPS Poetry Challenge</h1>
-              <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">Your Voting Ticket</p>
+              <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">Your Voting Code</p>
             </td>
           </tr>
           

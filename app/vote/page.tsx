@@ -36,7 +36,7 @@ export default function VotePage() {
       const data = await response.json()
       const teamsData = data?.teams ?? []
       setTeams(teamsData)
-      
+
       // Flatten all participants from all teams
       const allParticipants: Participant[] = []
       teamsData.forEach((team: Team) => {
@@ -260,7 +260,7 @@ export default function VotePage() {
               <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">Your Vote is Recorded!</h3>
               <p className="text-muted-foreground mb-2">Thank you for voting in the MPS Poetry Challenge</p>
               <p className="text-sm text-muted-foreground mb-8">
-                This code has completed its voting. To vote again, purchase another voting ticket.
+                This code has completed its voting. To vote again, purchase another voting code.
               </p>
               <div className="space-y-4">
                 <Link href="/">
@@ -340,47 +340,47 @@ export default function VotePage() {
                   const teamParticipants = participants.filter((p) => p.teamId === team.id)
                   const selectedParticipant = selections[team.id]
 
-                return (
-                  <div key={team.id} className="animate-fade-in-up" style={{ animationDelay: `${teamIdx * 100}ms` }}>
-                    <Card className="bg-gradient-to-r from-primary/10 to-accent/10 border-primary/30 backdrop-blur mb-6 p-4 sm:p-6">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                        <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 border-2 border-primary/40 shadow-md">
-                          <Image
-                            src={team.coach.image || "/placeholder.svg"}
-                            alt={team.coach.name}
-                            fill
-                            className="object-cover"
-                          />
+                  return (
+                    <div key={team.id} className="animate-fade-in-up" style={{ animationDelay: `${teamIdx * 100}ms` }}>
+                      <Card className="bg-gradient-to-r from-primary/10 to-accent/10 border-primary/30 backdrop-blur mb-6 p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                          <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 border-2 border-primary/40 shadow-md">
+                            <Image
+                              src={team.coach.image || "/placeholder.svg"}
+                              alt={team.coach.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-xl sm:text-2xl font-bold text-foreground">{team.name}</h3>
+                            <p className="text-xs sm:text-sm text-muted-foreground">Coach: {team.coach.name}</p>
+                          </div>
+                          <div className="flex items-center gap-3 ml-auto">
+                            <div className="w-5 h-5 rounded-full shadow-lg" style={{ backgroundColor: team.color }} />
+                            {selectedParticipant && (
+                              <span className="text-xs sm:text-sm font-medium px-3 py-1 rounded-full bg-accent/20 text-accent whitespace-nowrap">
+                                ✓ Selected
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <h3 className="text-xl sm:text-2xl font-bold text-foreground">{team.name}</h3>
-                          <p className="text-xs sm:text-sm text-muted-foreground">Coach: {team.coach.name}</p>
-                        </div>
-                        <div className="flex items-center gap-3 ml-auto">
-                          <div className="w-5 h-5 rounded-full shadow-lg" style={{ backgroundColor: team.color }} />
-                          {selectedParticipant && (
-                            <span className="text-xs sm:text-sm font-medium px-3 py-1 rounded-full bg-accent/20 text-accent whitespace-nowrap">
-                              ✓ Selected
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
+                      </Card>
 
-                    <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
-                      {teamParticipants.map((participant) => (
-                        <VotingCard
-                          key={participant.id}
-                          participant={participant}
-                          isSelected={selectedParticipant === participant.id}
-                          onSelect={() => handleVoteSelect(team.id, participant.id)}
-                          teamColor={team.color}
-                        />
-                      ))}
+                      <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
+                        {teamParticipants.map((participant) => (
+                          <VotingCard
+                            key={participant.id}
+                            participant={participant}
+                            isSelected={selectedParticipant === participant.id}
+                            onSelect={() => handleVoteSelect(team.id, participant.id)}
+                            teamColor={team.color}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
               </div>
             </div>
 
@@ -392,56 +392,56 @@ export default function VotePage() {
                     {Object.keys(selections).length} of {teams.length} teams selected
                   </CardDescription>
                 </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="bg-accent/10 border border-accent/20 rounded-lg p-4">
-                  <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2">Voting Code</p>
-                  <p className="text-lg font-mono font-bold text-foreground">{votingCode}</p>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-foreground text-sm">Selected Votes:</h4>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {teams.map((team) => {
-                      const selectedId = selections[team.id]
-                      const selectedParticipant = participants.find((p) => p.id === selectedId)
-                      return (
-                        <div key={team.id} className="text-sm text-muted-foreground flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color }} />
-                          <span className="font-medium text-foreground">{team.name}:</span>{" "}
-                          {selectedParticipant ? selectedParticipant.name : "Not selected"}
-                        </div>
-                      )
-                    })}
+                <CardContent className="space-y-6">
+                  <div className="bg-accent/10 border border-accent/20 rounded-lg p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2">Voting Code</p>
+                    <p className="text-lg font-mono font-bold text-foreground">{votingCode}</p>
                   </div>
-                </div>
 
-                <div className="border-t border-border/40 pt-4">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Each voting code can only be used once. To vote again, purchase another ticket.
-                  </p>
-                  <Button
-                    onClick={handleSubmitVotes}
-                    disabled={!isAllTeamsSelected || isSubmittingVotes}
-                    className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 disabled:opacity-50 transition-all duration-300 group"
-                    size="lg"
-                  >
-                    {isSubmittingVotes ? (
-                      <>
-                        <Spinner size="sm" className="mr-2" />
-                        Submitting Votes...
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                        Submit Votes
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-foreground text-sm">Selected Votes:</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {teams.map((team) => {
+                        const selectedId = selections[team.id]
+                        const selectedParticipant = participants.find((p) => p.id === selectedId)
+                        return (
+                          <div key={team.id} className="text-sm text-muted-foreground flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color }} />
+                            <span className="font-medium text-foreground">{team.name}:</span>{" "}
+                            {selectedParticipant ? selectedParticipant.name : "Not selected"}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border/40 pt-4">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Each voting code can only be used once. To vote again, purchase another ticket.
+                    </p>
+                    <Button
+                      onClick={handleSubmitVotes}
+                      disabled={!isAllTeamsSelected || isSubmittingVotes}
+                      className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 disabled:opacity-50 transition-all duration-300 group"
+                      size="lg"
+                    >
+                      {isSubmittingVotes ? (
+                        <>
+                          <Spinner size="sm" className="mr-2" />
+                          Submitting Votes...
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                          Submit Votes
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
         )}
       </div>
     </div>

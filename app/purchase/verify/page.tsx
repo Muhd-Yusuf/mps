@@ -121,7 +121,7 @@ function VerifyContent() {
               </div>
             </div>
             <CardTitle className="text-4xl text-foreground">Payment Successful!</CardTitle>
-            <CardDescription className="text-lg mt-2">Your voting ticket has been purchased</CardDescription>
+            <CardDescription className="text-lg mt-2">Your voting code has been purchased</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-8">
@@ -149,7 +149,7 @@ function VerifyContent() {
             {/* Order Summary */}
             <div className="space-y-3">
               <div className="flex justify-between text-muted-foreground">
-                <span>Voting Ticket (5 Teams)</span>
+                <span>Voting Code (5 Teams)</span>
                 <span>₦{ticket?.amount?.toLocaleString() || "2,000"}.00</span>
               </div>
               <div className="flex justify-between border-t border-border/40 pt-3">
