@@ -32,9 +32,10 @@ export interface Vote {
   timestamp: Date
 }
 
-export interface VoteSelection {
-  [teamId: string]: string // teamId -> participantId
-}
+export type VoteSelection = {
+  teamId: string
+  participantId: string
+}[]
 
 export interface Ticket {
   id: string;

@@ -70,8 +70,8 @@ function VerifyContent() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
             <Link href="/" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
               <ArrowLeft className="w-5 h-5" />
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                MPS Poetry Challenge
+              <h1 className="text-md font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                MPS Media Poetry Challenge
               </h1>
             </Link>
           </div>
@@ -105,8 +105,8 @@ function VerifyContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
             <ArrowLeft className="w-5 h-5" />
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              MPS Poetry Challenge
+            <h1 className="text-md md:text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              MPS Media Poetry Challenge
             </h1>
           </Link>
         </div>
@@ -129,7 +129,7 @@ function VerifyContent() {
             {ticket?.votingCode && (
               <div className="bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/40 rounded-2xl p-8 text-center">
                 <p className="text-muted-foreground text-sm uppercase tracking-widest mb-3">Your Voting Code</p>
-                <div className="text-5xl font-bold tracking-wider text-foreground font-mono mb-4 p-4 bg-background/50 rounded-xl border border-primary/20">
+                <div className="md:text-3xl text-xl font-bold tracking-wider text-foreground  mb-4 p-4 bg-background/50 rounded-xl border border-primary/20">
                   {ticket.votingCode}
                 </div>
                 <p className="text-muted-foreground text-sm">Use this code to vote and view leaderboard. Save it safely!</p>
@@ -148,10 +148,7 @@ function VerifyContent() {
 
             {/* Order Summary */}
             <div className="space-y-3">
-              <div className="flex justify-between text-muted-foreground">
-                <span>Voting Code (5 Teams)</span>
-                <span>₦{ticket?.amount?.toLocaleString() || "2,000"}.00</span>
-              </div>
+
               <div className="flex justify-between border-t border-border/40 pt-3">
                 <span className="font-semibold text-foreground">Total Paid</span>
                 <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -160,28 +157,6 @@ function VerifyContent() {
               </div>
             </div>
 
-            {/* Next Steps */}
-            <div className="bg-secondary/50 border border-border/40 rounded-xl p-6 space-y-4">
-              <h4 className="font-semibold text-foreground">What's Next?</h4>
-              <ol className="space-y-3 text-muted-foreground text-sm">
-                <li className="flex gap-3">
-                  <span className="font-bold text-primary">1.</span>
-                  <span>Copy your voting code or check your email</span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="font-bold text-primary">2.</span>
-                  <span>Go to the voting page and enter your code</span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="font-bold text-primary">3.</span>
-                  <span>Select one participant from each of the teams</span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="font-bold text-primary">4.</span>
-                  <span>View live vote counts on the leaderboard</span>
-                </li>
-              </ol>
-            </div>
 
             {/* Action Buttons */}
             <div className="flex gap-4 flex-col sm:flex-row">
@@ -190,11 +165,7 @@ function VerifyContent() {
                   Enter Code & Vote
                 </Button>
               </Link>
-              <Link href="/" className="flex-1">
-                <Button variant="outline" className="w-full bg-transparent" size="lg">
-                  Back to Home
-                </Button>
-              </Link>
+
             </div>
           </CardContent>
         </Card>

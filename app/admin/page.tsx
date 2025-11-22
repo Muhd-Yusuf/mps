@@ -16,6 +16,7 @@ import AdminVotingResults from "@/components/admin-voting-results"
 import AdminCharts from "@/components/admin-charts"
 import AdminStageManager from "@/components/admin-stage-manager"
 import AdminRevenue from "@/components/admin-revenue"
+import AdminSettings from "@/components/admin-settings"
 
 const statsIcons = ["📊", "👥", "🎤", "📈"] as const
 
@@ -263,7 +264,7 @@ export default function AdminPage() {
 
         <Tabs defaultValue="results" className="space-y-6 w-full">
           <div className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
               <TabsTrigger value="results" className="data-[state=active]:bg-primary/20">
                 Voting Results
               </TabsTrigger>
@@ -275,6 +276,9 @@ export default function AdminPage() {
               </TabsTrigger>
               <TabsTrigger value="revenue" className="data-[state=active]:bg-primary/20">
                 Revenue
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="data-[state=active]:bg-primary/20">
+                Settings
               </TabsTrigger>
             </TabsList>
           </div>
@@ -293,6 +297,9 @@ export default function AdminPage() {
           </TabsContent>
           <TabsContent value="revenue" className="animate-fade-in-up">
             <AdminRevenue />
+          </TabsContent>
+          <TabsContent value="settings" className="animate-fade-in-up">
+            <AdminSettings />
           </TabsContent>
         </Tabs>
       </div>

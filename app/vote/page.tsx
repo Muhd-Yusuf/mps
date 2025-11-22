@@ -10,9 +10,10 @@ import { ArrowLeft, Lock, AlertCircle } from "lucide-react"
 import { Spinner, LoadingSpinner } from "@/components/ui/spinner"
 import Link from "next/link"
 import Image from "next/image"
+import { toast } from "sonner"
 
 export default function VotePage() {
-  const [selections, setSelections] = useState<VoteSelection>({})
+  const [selections, setSelections] = useState<VoteSelection>([])
   const [votingCode, setVotingCode] = useState("")
   const [codeVerified, setCodeVerified] = useState(false)
   const [codeInput, setCodeInput] = useState("")
@@ -24,16 +25,27 @@ export default function VotePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isSubmittingVotes, setIsSubmittingVotes] = useState(false)
+  const [maxVotes, setMaxVotes] = useState(3)
 
   const fetchTeams = useCallback(async () => {
     try {
       setIsLoading(true)
       setLoadError(null)
-      const response = await fetch("/api/teams", { cache: "no-store" })
-      if (!response.ok) {
+      const [teamsResponse, settingsResponse] = await Promise.all([
+        fetch("/api/teams", { cache: "no-store" }),
+        fetch("/api/settings", { cache: "no-store" })
+      ])
+
+      if (!teamsResponse.ok) {
         throw new Error("Failed to load teams")
       }
-      const data = await response.json()
+
+      if (settingsResponse.ok) {
+        const settingsData = await settingsResponse.json()
+        setMaxVotes(settingsData.maxVotes)
+      }
+
+      const data = await teamsResponse.json()
       const teamsData = data?.teams ?? []
       setTeams(teamsData)
 
@@ -92,10 +104,21 @@ export default function VotePage() {
   }, [codeVerified, fetchTeams])
 
   const handleVoteSelect = (teamId: string, participantId: string) => {
-    setSelections((prev) => ({
-      ...prev,
-      [teamId]: participantId,
-    }))
+    setSelections((prev) => {
+      const isSelected = prev.some((s) => s.participantId === participantId)
+
+      if (isSelected) {
+        // Remove if already selected
+        return prev.filter((s) => s.participantId !== participantId)
+      } else {
+        // Add if not selected, checking max votes
+        if (prev.length >= maxVotes) {
+          toast.error(`You can only vote for up to ${maxVotes} contestants`)
+          return prev
+        }
+        return [...prev, { teamId, participantId }]
+      }
+    })
   }
 
   const handleVerifyCode = async () => {
@@ -135,8 +158,8 @@ export default function VotePage() {
   }
 
   const handleSubmitVotes = async () => {
-    if (Object.keys(selections).length !== teams.length) {
-      alert("Please select one participant from each team")
+    if (selections.length !== maxVotes) {
+      toast.error(`Please select exactly ${maxVotes} contestants`)
       return
     }
 
@@ -165,14 +188,13 @@ export default function VotePage() {
 
       setCodeHasVoted(true)
       setHasVoted(true)
+      toast.success("Votes cast successfully!")
     } catch (error: any) {
-      alert(error?.message ?? "Failed to submit votes. Please try again.")
+      toast.error(error?.message ?? "Failed to submit votes. Please try again.")
     } finally {
       setIsSubmittingVotes(false)
     }
   }
-
-  const isAllTeamsSelected = teams.length > 0 && teams.length === Object.keys(selections).length
 
   if (!codeVerified) {
     return (
@@ -234,6 +256,8 @@ export default function VotePage() {
       </div>
     )
   }
+
+
 
   if (hasVoted || codeHasVoted) {
     return (
@@ -338,7 +362,7 @@ export default function VotePage() {
               <div className="space-y-8 sm:space-y-10">
                 {teams.map((team, teamIdx) => {
                   const teamParticipants = participants.filter((p) => p.teamId === team.id)
-                  const selectedParticipant = selections[team.id]
+                  const selectedCount = selections.filter((s) => s.teamId === team.id).length
 
                   return (
                     <div key={team.id} className="animate-fade-in-up" style={{ animationDelay: `${teamIdx * 100}ms` }}>
@@ -358,9 +382,9 @@ export default function VotePage() {
                           </div>
                           <div className="flex items-center gap-3 ml-auto">
                             <div className="w-5 h-5 rounded-full shadow-lg" style={{ backgroundColor: team.color }} />
-                            {selectedParticipant && (
+                            {selectedCount > 0 && (
                               <span className="text-xs sm:text-sm font-medium px-3 py-1 rounded-full bg-accent/20 text-accent whitespace-nowrap">
-                                ✓ Selected
+                                ✓ {selectedCount} Selected
                               </span>
                             )}
                           </div>
@@ -372,7 +396,7 @@ export default function VotePage() {
                           <VotingCard
                             key={participant.id}
                             participant={participant}
-                            isSelected={selectedParticipant === participant.id}
+                            isSelected={selections.some(s => s.participantId === participant.id)}
                             onSelect={() => handleVoteSelect(team.id, participant.id)}
                             teamColor={team.color}
                           />
@@ -389,7 +413,7 @@ export default function VotePage() {
                 <CardHeader>
                   <CardTitle className="text-foreground">Your Votes</CardTitle>
                   <CardDescription>
-                    {Object.keys(selections).length} of {teams.length} teams selected
+                    {selections.length} of {maxVotes} votes used
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -401,17 +425,24 @@ export default function VotePage() {
                   <div className="space-y-3">
                     <h4 className="font-semibold text-foreground text-sm">Selected Votes:</h4>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {teams.map((team) => {
-                        const selectedId = selections[team.id]
-                        const selectedParticipant = participants.find((p) => p.id === selectedId)
-                        return (
-                          <div key={team.id} className="text-sm text-muted-foreground flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color }} />
-                            <span className="font-medium text-foreground">{team.name}:</span>{" "}
-                            {selectedParticipant ? selectedParticipant.name : "Not selected"}
-                          </div>
-                        )
-                      })}
+                      {selections.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">No votes selected yet</p>
+                      ) : (
+                        selections.map((selection) => {
+                          const participant = participants.find((p) => p.id === selection.participantId)
+                          const team = teams.find((t) => t.id === selection.teamId)
+
+                          if (!participant || !team) return null
+
+                          return (
+                            <div key={selection.participantId} className="text-sm text-muted-foreground flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color }} />
+                              <span className="font-medium text-foreground">{team.name}:</span>{" "}
+                              {participant.name}
+                            </div>
+                          )
+                        })
+                      )}
                     </div>
                   </div>
 
@@ -421,7 +452,7 @@ export default function VotePage() {
                     </p>
                     <Button
                       onClick={handleSubmitVotes}
-                      disabled={!isAllTeamsSelected || isSubmittingVotes}
+                      disabled={selections.length !== maxVotes || isSubmittingVotes}
                       className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 disabled:opacity-50 transition-all duration-300 group"
                       size="lg"
                     >

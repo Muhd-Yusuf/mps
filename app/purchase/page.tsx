@@ -113,7 +113,7 @@ export default function PurchasePage() {
               <h4 className="font-semibold text-foreground mb-4">Package Details</h4>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Voting Access (5 Teams)</span>
+                  <span className="text-muted-foreground">Voting Access</span>
                   <span className="font-medium text-foreground">₦{TICKET_PRICE.toLocaleString()}.00</span>
                 </div>
                 <div className="flex justify-between border-t border-primary/20 pt-3">

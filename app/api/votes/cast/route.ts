@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import mongoose from "mongoose"
 
-import { connectToDatabase, TicketModel, VoteModel, TeamModel } from "@/lib/mongodb"
+import { connectToDatabase, TicketModel, VoteModel, TeamModel, SettingModel } from "@/lib/mongodb"
 
 const voteSchema = z.object({
   votingCode: z.string().min(1, "Voting code is required"),
@@ -14,6 +14,16 @@ const voteSchema = z.object({
 export async function POST(request: Request) {
   try {
     const payload = await request.json()
+
+    // Define schema here to handle the new structure
+    const voteSchema = z.object({
+      votingCode: z.string().min(1, "Voting code is required"),
+      selections: z.array(z.object({
+        teamId: z.string(),
+        participantId: z.string()
+      })).min(1, "At least one selection is required")
+    })
+
     const parsed = voteSchema.safeParse(payload)
 
     if (!parsed.success) {
@@ -21,6 +31,16 @@ export async function POST(request: Request) {
     }
 
     await connectToDatabase()
+
+    // Get max votes setting
+    const setting = await SettingModel.findOne({ key: "max_votes_per_ticket" }).lean()
+    const maxVotes = setting ? parseInt(setting.value, 10) : 3 // Default to 3
+
+    if (parsed.data.selections.length > maxVotes) {
+      return NextResponse.json({
+        error: `You can only vote for up to ${maxVotes} contestants`
+      }, { status: 400 })
+    }
 
     // Verify ticket
     const ticket = await TicketModel.findOne({
@@ -40,7 +60,7 @@ export async function POST(request: Request) {
     }
 
     // Verify all teams and participants exist
-    const teamIds = Object.keys(parsed.data.selections).map((id) => {
+    const teamIds = [...new Set(parsed.data.selections.map(s => s.teamId))].map((id) => {
       try {
         return new mongoose.Types.ObjectId(id)
       } catch {
@@ -49,26 +69,23 @@ export async function POST(request: Request) {
     }).filter(Boolean) as mongoose.Types.ObjectId[]
 
     const teams = await TeamModel.find({ _id: { $in: teamIds } })
-    if (teams.length !== Object.keys(parsed.data.selections).length) {
-      return NextResponse.json({ error: "Invalid team selection" }, { status: 400 })
-    }
 
     // Verify participants belong to their teams
-    for (const [teamId, participantId] of Object.entries(parsed.data.selections)) {
-      const team = teams.find((t) => t._id.toString() === teamId)
+    for (const selection of parsed.data.selections) {
+      const team = teams.find((t) => t._id.toString() === selection.teamId)
       if (!team) {
-        return NextResponse.json({ error: `Team ${teamId} not found` }, { status: 400 })
+        return NextResponse.json({ error: `Team ${selection.teamId} not found` }, { status: 400 })
       }
 
-      const participant = team.participants?.find((p: any) => p._id.toString() === participantId)
+      const participant = team.participants?.find((p: any) => p._id.toString() === selection.participantId)
       if (!participant) {
-        return NextResponse.json({ error: `Participant ${participantId} not found in team ${teamId}` }, { status: 400 })
+        return NextResponse.json({ error: `Participant ${selection.participantId} not found in team ${selection.teamId}` }, { status: 400 })
       }
     }
 
     // Create votes
     const votes = await Promise.all(
-      Object.entries(parsed.data.selections).map(([teamId, participantId]) =>
+      parsed.data.selections.map(({ teamId, participantId }) =>
         VoteModel.create({
           ticketId: ticket._id,
           participantId,
@@ -78,7 +95,7 @@ export async function POST(request: Request) {
     )
 
     // Update participant vote counts
-    for (const [teamId, participantId] of Object.entries(parsed.data.selections)) {
+    for (const { teamId, participantId } of parsed.data.selections) {
       try {
         await TeamModel.updateOne(
           { _id: new mongoose.Types.ObjectId(teamId), "participants._id": new mongoose.Types.ObjectId(participantId) },
