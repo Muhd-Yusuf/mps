@@ -40,6 +40,8 @@ function serializeTeam(team: any) {
     name: team.name,
     color: team.color,
     coach: team.coach,
+    votingOpen: team.votingOpen ?? false,
+    order: team.order ?? 0,
     participants: (team.participants || []).map((participant: any) => ({
       id: participant._id.toString(),
       name: participant.name,
@@ -106,6 +108,52 @@ export async function PUT(request: Request, { params }: { params: Promise<{ team
     return NextResponse.json({ team: serializeTeam(updatedTeam.toObject()) })
   } catch (error) {
     console.error("[UPDATE_TEAM_ERROR]", error)
+    return NextResponse.json({ error: "Failed to update team" }, { status: 500 })
+  }
+}
+
+const patchSchema = z.object({
+  votingOpen: z.boolean().optional(),
+  order: z.number().int().nonnegative().optional(),
+})
+
+// Partial update that never touches participants/votes. Used to open/close a team
+// for voting (only one team may be open at a time) or set its ordering.
+export async function PATCH(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
+  const { teamId } = await params
+
+  if (!teamId || !mongoose.Types.ObjectId.isValid(teamId)) {
+    return NextResponse.json({ error: "Invalid team ID" }, { status: 400 })
+  }
+
+  try {
+    const payload = await request.json()
+    const parsed = patchSchema.safeParse(payload)
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+    }
+
+    await connectToDatabase()
+
+    // Opening a team closes every other team so only one round is ever live.
+    if (parsed.data.votingOpen === true) {
+      await TeamModel.updateMany({ _id: { $ne: teamId } }, { $set: { votingOpen: false } })
+    }
+
+    const update: Record<string, unknown> = {}
+    if (parsed.data.votingOpen !== undefined) update.votingOpen = parsed.data.votingOpen
+    if (parsed.data.order !== undefined) update.order = parsed.data.order
+
+    const updatedTeam = await TeamModel.findByIdAndUpdate(teamId, { $set: update }, { new: true })
+
+    if (!updatedTeam) {
+      return NextResponse.json({ error: "Team not found" }, { status: 404 })
+    }
+
+    return NextResponse.json({ team: serializeTeam(updatedTeam.toObject()) })
+  } catch (error) {
+    console.error("[PATCH_TEAM_ERROR]", error)
     return NextResponse.json({ error: "Failed to update team" }, { status: 500 })
   }
 }

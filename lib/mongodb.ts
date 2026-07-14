@@ -57,6 +57,9 @@ const teamSchema = new Schema(
     color: { type: String, required: true, trim: true },
     coach: { type: coachSchema, required: true },
     participants: { type: [participantSchema], default: [] },
+    // Sequential "objective" voting: only the currently-open team accepts votes.
+    votingOpen: { type: Boolean, default: false },
+    order: { type: Number, default: 0 },
   },
   { timestamps: true }
 )

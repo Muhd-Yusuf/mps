@@ -39,6 +39,8 @@ function serializeTeam(team: any) {
     name: team.name,
     color: team.color,
     coach: team.coach,
+    votingOpen: team.votingOpen ?? false,
+    order: team.order ?? 0,
     participants: (team.participants || []).map((participant: any) => ({
       id: participant._id.toString(),
       name: participant.name,
@@ -56,7 +58,7 @@ function serializeTeam(team: any) {
 export async function GET() {
   try {
     await connectToDatabase()
-    const teams = await TeamModel.find().sort({ createdAt: -1 }).lean()
+    const teams = await TeamModel.find().sort({ order: 1, createdAt: 1 }).lean()
 
     return NextResponse.json({ teams: teams.map(serializeTeam) })
   } catch (error) {
