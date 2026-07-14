@@ -47,6 +47,7 @@ export interface Ticket {
   isPaid: boolean;
   paystackReference?: string;
   hasVoted: boolean;
+  roundTeamId?: string;
   createdAt: string;
   updatedAt: string;
 }

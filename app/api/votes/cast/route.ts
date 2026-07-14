@@ -87,6 +87,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `Voting for ${team.name} is not open` }, { status: 400 })
       }
 
+      // A ticket may only vote in its own round (older tickets can't carry over).
+      if (ticket.roundTeamId && ticket.roundTeamId !== selection.teamId) {
+        return NextResponse.json(
+          { error: "This voting code is not valid for the current round" },
+          { status: 400 }
+        )
+      }
+
       const participant = team.participants?.find((p: any) => p._id.toString() === selection.participantId)
       if (!participant) {
         return NextResponse.json({ error: `Participant ${selection.participantId} not found in team ${selection.teamId}` }, { status: 400 })

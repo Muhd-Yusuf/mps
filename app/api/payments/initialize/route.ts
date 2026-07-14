@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import https from "https"
 
-import { connectToDatabase, TicketModel } from "@/lib/mongodb"
+import { connectToDatabase, TicketModel, TeamModel } from "@/lib/mongodb"
 import { generateVotingCode } from "@/lib/code-utils"
 
 const initializeSchema = z.object({
@@ -74,12 +74,27 @@ export async function POST(request: Request) {
 
     await connectToDatabase()
 
-    // One ticket per email: block if this email already has a paid ticket.
+    // Tickets are per-round. A round is whichever team is currently open for voting.
+    const openTeam = await TeamModel.findOne({ votingOpen: true })
+    if (!openTeam) {
+      return NextResponse.json(
+        { error: "Voting is not open right now. Please wait for the next round." },
+        { status: 409 }
+      )
+    }
+    const roundTeamId = openTeam._id.toString()
+
+    // One ticket per email per round: block only if this email already has a paid
+    // ticket for the current open round (a new round frees them to buy again).
     const normalizedEmail = parsed.data.email.toLowerCase().trim()
-    const existingPaidTicket = await TicketModel.findOne({ email: normalizedEmail, isPaid: true })
+    const existingPaidTicket = await TicketModel.findOne({
+      email: normalizedEmail,
+      isPaid: true,
+      roundTeamId,
+    })
     if (existingPaidTicket) {
       return NextResponse.json(
-        { error: "This email has already purchased a voting code. Only one ticket is allowed per email." },
+        { error: "This email has already purchased a voting code for the current round." },
         { status: 409 }
       )
     }
@@ -98,10 +113,11 @@ export async function POST(request: Request) {
 
     // Create ticket record
     const ticket = await TicketModel.create({
-      email: parsed.data.email.toLowerCase().trim(),
+      email: normalizedEmail,
       votingCode,
       amount: parsed.data.amount,
       isPaid: false,
+      roundTeamId,
     })
 
     // Initialize Paystack payment
