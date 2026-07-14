@@ -21,6 +21,8 @@ export interface Team {
   color: string
   coach: Coach
   participants?: Participant[]
+  votingOpen?: boolean
+  order?: number
   createdAt?: string
   updatedAt?: string
 }

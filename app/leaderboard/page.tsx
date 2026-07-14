@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { ArrowLeft, Lock, AlertCircle, TrendingUp, Trophy, Users, BarChart3, PieChart } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/spinner"
 import type { Team, Participant } from "@/lib/types"
@@ -12,9 +12,8 @@ import Image from "next/image"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, LineChart, Line } from "recharts"
 
 export default function LeaderboardPage() {
-  const [codeVerified, setCodeVerified] = useState(false)
-  const [codeInput, setCodeInput] = useState("")
-  const [error, setError] = useState("")
+  const { status } = useSession()
+  const isAdmin = status === "authenticated"
   const [teams, setTeams] = useState<Team[]>([])
   const [participants, setParticipants] = useState<Participant[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -54,32 +53,10 @@ export default function LeaderboardPage() {
   }, [])
 
   useEffect(() => {
-    const stored = localStorage.getItem("votingCode")
-    if (stored) {
-      // Verify stored code with API
-      fetch("/api/tickets/verify-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: stored }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.valid) {
-            setCodeVerified(true)
-          }
-        })
-        .catch(() => {
-          // If verification fails, clear stored code
-          localStorage.removeItem("votingCode")
-        })
-    }
-  }, [])
-
-  useEffect(() => {
-    if (codeVerified) {
+    if (isAdmin) {
       fetchTeams()
     }
-  }, [codeVerified, fetchTeams])
+  }, [isAdmin, fetchTeams])
 
   // Compute comprehensive statistics
   const stats = useMemo(() => {
@@ -162,42 +139,7 @@ export default function LeaderboardPage() {
 
   const COLORS = ["#667eea", "#764ba2", "#f093fb", "#4facfe", "#00f2fe", "#43e97b", "#fa709a", "#fee140", "#30cfd0", "#a8edea"]
 
-  const handleVerifyCode = async () => {
-    if (!codeInput.trim()) {
-      setError("Please enter your voting code")
-      return
-    }
-
-    try {
-      setError("")
-      const response = await fetch("/api/tickets/verify-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: codeInput.trim() }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData?.error ?? "Invalid voting code")
-      }
-
-      const data = await response.json()
-
-      if (!data.valid) {
-        throw new Error("Invalid voting code")
-      }
-
-      // If API returns valid, ticket is already verified as paid
-      // Allow access regardless of whether it has been used to vote
-      setCodeVerified(true)
-      localStorage.setItem("votingCode", codeInput.trim().toUpperCase())
-      setError("")
-    } catch (error: any) {
-      setError(error?.message ?? "Failed to verify code. Please try again.")
-    }
-  }
-
-  if (!codeVerified) {
+  if (!isAdmin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-background">
         <nav className="border-b border-border/40 bg-background/80 backdrop-blur-xl sticky top-0 z-40">
@@ -216,36 +158,22 @@ export default function LeaderboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Lock className="w-5 h-5 text-primary" />
-                Code Required to View Leaderboard
+                Admin Access Required
               </CardTitle>
-              <CardDescription>Enter your voting code to see live results</CardDescription>
+              <CardDescription>The leaderboard is only available to administrators</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-3">Voting Code</label>
-                <Input
-                  placeholder="MPS-2025-ABC123"
-                  value={codeInput}
-                  onChange={(e) => {
-                    setCodeInput(e.target.value.toUpperCase())
-                    setError("")
-                  }}
-                  className="bg-input border-border/40 text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-colors text-lg tracking-widest text-center font-mono"
-                />
-              </div>
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-red-600 text-sm">{error}</p>
-                </div>
-              )}
-              <Button
-                onClick={handleVerifyCode}
-                className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20"
-                size="lg"
-              >
-                View Leaderboard
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                Live rankings are restricted. Please sign in from the admin dashboard to view results.
+              </p>
+              <Link href="/admin" className="block">
+                <Button
+                  className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20"
+                  size="lg"
+                >
+                  Go to Admin Login
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         </div>

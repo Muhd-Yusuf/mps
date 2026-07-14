@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Image from "next/image"
-import { Plus, UserPlus, Trash2, Edit2 } from "lucide-react"
+import { Plus, UserPlus, Trash2, Edit2, Radio } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 
 import type { Team, Participant } from "@/lib/types"
@@ -95,6 +95,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
     teamName: "",
   })
   const [isDeletingTeam, setIsDeletingTeam] = useState(false)
+  const [togglingTeamId, setTogglingTeamId] = useState<string | null>(null)
 
   const teamOptions = useMemo(() => teams ?? [], [teams])
 
@@ -528,6 +529,39 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
     }
   }
 
+  const handleToggleVoting = async (team: Team) => {
+    const nextOpen = !team.votingOpen
+    try {
+      setTogglingTeamId(team.id)
+      const response = await fetch(`/api/teams/${team.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ votingOpen: nextOpen }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error?.error ?? "Unable to update voting status")
+      }
+
+      toast({
+        title: nextOpen ? "Voting opened" : "Voting closed",
+        description: nextOpen
+          ? `${team.name} is now open for voting. Other teams were closed.`
+          : `${team.name} is now closed for voting.`,
+      })
+      await onRefresh?.()
+    } catch (error: any) {
+      toast({
+        title: "Failed to update voting status",
+        description: error?.message ?? "Please try again later",
+        variant: "destructive",
+      })
+    } finally {
+      setTogglingTeamId(null)
+    }
+  }
+
   const openDeleteDialog = (team: Team) => {
     setDeleteDialog({ open: true, teamId: team.id, teamName: team.name })
   }
@@ -788,6 +822,20 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant={team.votingOpen ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleToggleVoting(team)}
+                      disabled={togglingTeamId === team.id}
+                      className={team.votingOpen ? "" : "border-border/40 hover:bg-muted"}
+                    >
+                      {togglingTeamId === team.id ? (
+                        <Spinner size="sm" className="mr-2" />
+                      ) : (
+                        <Radio className="mr-2 h-4 w-4" />
+                      )}
+                      {team.votingOpen ? "Close Voting" : "Open Voting"}
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

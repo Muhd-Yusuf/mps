@@ -46,8 +46,12 @@ export default function VotePage() {
       }
 
       const data = await teamsResponse.json()
-      const teamsData = data?.teams ?? []
+      // Sequential "objective" voting: only teams the admin has opened are votable.
+      const teamsData = (data?.teams ?? []).filter((team: Team) => team.votingOpen)
       setTeams(teamsData)
+
+      // Voter picks exactly one contestant per open team.
+      setMaxVotes(teamsData.length)
 
       // Flatten all participants from all teams
       const allParticipants: Participant[] = []
@@ -108,16 +112,12 @@ export default function VotePage() {
       const isSelected = prev.some((s) => s.participantId === participantId)
 
       if (isSelected) {
-        // Remove if already selected
+        // Toggle off if the same contestant is tapped again.
         return prev.filter((s) => s.participantId !== participantId)
-      } else {
-        // Add if not selected, checking max votes
-        if (prev.length >= maxVotes) {
-          toast.error(`You can only vote for up to ${maxVotes} contestants`)
-          return prev
-        }
-        return [...prev, { teamId, participantId }]
       }
+
+      // One contestant per team: drop any existing pick for this team, then add.
+      return [...prev.filter((s) => s.teamId !== teamId), { teamId, participantId }]
     })
   }
 
@@ -342,7 +342,7 @@ export default function VotePage() {
         {!isLoading && !loadError && teams.length === 0 && (
           <Card className="bg-card/50 border-border/40 backdrop-blur">
             <CardContent className="pt-6 text-center py-12">
-              <p className="text-muted-foreground">No teams available yet. Please check back later.</p>
+              <p className="text-muted-foreground">Voting is not open right now. Please check back later.</p>
             </CardContent>
           </Card>
         )}

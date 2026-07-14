@@ -17,6 +17,7 @@ import AdminCharts from "@/components/admin-charts"
 import AdminStageManager from "@/components/admin-stage-manager"
 import AdminRevenue from "@/components/admin-revenue"
 import AdminSettings from "@/components/admin-settings"
+import AdminReport from "@/components/admin-report"
 
 const statsIcons = ["📊", "👥", "🎤", "📈"] as const
 
@@ -261,6 +262,8 @@ export default function AdminPage() {
             {teamsError}. You can retry with the refresh button above.
           </div>
         )}
+
+        <AdminReport />
 
         <Tabs defaultValue="results" className="space-y-6 w-full">
           <div className="w-full">

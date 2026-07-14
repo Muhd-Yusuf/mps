@@ -42,6 +42,12 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
+    // One contestant per team: reject duplicate teams in the same submission.
+    const selectionTeamIds = parsed.data.selections.map((s) => s.teamId)
+    if (new Set(selectionTeamIds).size !== selectionTeamIds.length) {
+      return NextResponse.json({ error: "You can only vote for one contestant per team" }, { status: 400 })
+    }
+
     // Verify ticket
     const ticket = await TicketModel.findOne({
       votingCode: parsed.data.votingCode.toUpperCase().trim(),
@@ -70,17 +76,32 @@ export async function POST(request: Request) {
 
     const teams = await TeamModel.find({ _id: { $in: teamIds } })
 
-    // Verify participants belong to their teams
+    // Verify participants belong to their teams and that each team is open for voting.
     for (const selection of parsed.data.selections) {
       const team = teams.find((t) => t._id.toString() === selection.teamId)
       if (!team) {
         return NextResponse.json({ error: `Team ${selection.teamId} not found` }, { status: 400 })
       }
 
+      if (!team.votingOpen) {
+        return NextResponse.json({ error: `Voting for ${team.name} is not open` }, { status: 400 })
+      }
+
       const participant = team.participants?.find((p: any) => p._id.toString() === selection.participantId)
       if (!participant) {
         return NextResponse.json({ error: `Participant ${selection.participantId} not found in team ${selection.teamId}` }, { status: 400 })
       }
+    }
+
+    // Atomically claim this ticket for voting to prevent double-submit races.
+    // Only one request can flip hasVoted false -> true; the rest get rejected here.
+    const claimedTicket = await TicketModel.findOneAndUpdate(
+      { _id: ticket._id, isPaid: true, hasVoted: false },
+      { $set: { hasVoted: true } }
+    )
+
+    if (!claimedTicket) {
+      return NextResponse.json({ error: "This voting code has already been used" }, { status: 400 })
     }
 
     // Create votes
@@ -105,11 +126,6 @@ export async function POST(request: Request) {
         console.error(`Failed to update votes for team ${teamId}, participant ${participantId}:`, error)
       }
     }
-
-    // Mark ticket as voted
-    await TicketModel.findByIdAndUpdate(ticket._id, {
-      hasVoted: true,
-    })
 
     return NextResponse.json({
       success: true,

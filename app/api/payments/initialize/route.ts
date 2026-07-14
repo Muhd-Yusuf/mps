@@ -74,6 +74,16 @@ export async function POST(request: Request) {
 
     await connectToDatabase()
 
+    // One ticket per email: block if this email already has a paid ticket.
+    const normalizedEmail = parsed.data.email.toLowerCase().trim()
+    const existingPaidTicket = await TicketModel.findOne({ email: normalizedEmail, isPaid: true })
+    if (existingPaidTicket) {
+      return NextResponse.json(
+        { error: "This email has already purchased a voting code. Only one ticket is allowed per email." },
+        { status: 409 }
+      )
+    }
+
     // Generate unique voting code
     let votingCode = generateVotingCode()
     let codeExists = true
