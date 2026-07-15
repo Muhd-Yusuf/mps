@@ -32,19 +32,13 @@ export default function VotePage() {
     try {
       setIsLoading(true)
       setLoadError(null)
-      const [teamsResponse, settingsResponse, labelResponse] = await Promise.all([
+      const [teamsResponse, labelResponse] = await Promise.all([
         fetch("/api/teams", { cache: "no-store" }),
-        fetch("/api/settings", { cache: "no-store" }),
         fetch("/api/settings/label", { cache: "no-store" })
       ])
 
       if (!teamsResponse.ok) {
         throw new Error("Failed to load teams")
-      }
-
-      if (settingsResponse.ok) {
-        const settingsData = await settingsResponse.json()
-        setMaxVotes(settingsData.maxVotes)
       }
 
       if (labelResponse.ok) {

@@ -32,20 +32,12 @@ export async function POST(request: Request) {
 
     await connectToDatabase()
 
-    // Get max votes setting
-    const setting = await SettingModel.findOne({ key: "max_votes_per_ticket" }).lean()
-    const maxVotes = setting ? parseInt(setting.value, 10) : 3 // Default to 3
-
     // Current round: a ticket may only be used to vote in the round it was bought for.
     const roundSetting = await SettingModel.findOne({ key: "current_round" }).lean()
     const currentRound = roundSetting ? parseInt(roundSetting.value, 10) || 1 : 1
 
-    if (parsed.data.selections.length > maxVotes) {
-      return NextResponse.json({
-        error: `You can only vote for up to ${maxVotes} contestants`
-      }, { status: 400 })
-    }
-
+    // Votes are bounded by "one contestant per open team", not a fixed count — a voter
+    // picks one contestant from each open team (100 open teams => up to 100 picks).
     // One contestant per team: reject duplicate teams in the same submission.
     const selectionTeamIds = parsed.data.selections.map((s) => s.teamId)
     if (new Set(selectionTeamIds).size !== selectionTeamIds.length) {
