@@ -45,6 +45,19 @@ export async function POST(request: Request) {
 
             // Check if ticket was already paid to avoid duplicate processing
             if (!ticket.isPaid) {
+                // One code per email per round: don't grant a second code if this
+                // email already has a paid ticket for the same round.
+                const duplicatePaid = await TicketModel.findOne({
+                    _id: { $ne: ticket._id },
+                    email: ticket.email,
+                    isPaid: true,
+                    ...(ticket.round != null ? { round: ticket.round } : {}),
+                })
+                if (duplicatePaid) {
+                    console.log(`Duplicate ticket for ${ticket.email} round ${ticket.round}; not granting a second code`)
+                    return NextResponse.json({ received: true, duplicate: true }, { status: 200 })
+                }
+
                 // Update ticket as paid
                 await TicketModel.findByIdAndUpdate(ticket._id, {
                     isPaid: true,

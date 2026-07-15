@@ -79,6 +79,27 @@ export async function GET(request: Request) {
     // Check if ticket was already paid to avoid sending duplicate emails
     const wasAlreadyPaid = ticket.isPaid
 
+    // One code per email per round: if this email already has a paid ticket for the
+    // same round, do NOT grant a second code. Guards the race where several tickets
+    // were initialized before any of them was paid.
+    if (!wasAlreadyPaid) {
+      const duplicatePaid = await TicketModel.findOne({
+        _id: { $ne: ticket._id },
+        email: ticket.email,
+        isPaid: true,
+        ...(ticket.round != null ? { round: ticket.round } : {}),
+      })
+      if (duplicatePaid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "This email already has a voting code for the current round. Only one is allowed per email.",
+          },
+          { status: 409 }
+        )
+      }
+    }
+
     // Update ticket as paid
     await TicketModel.findByIdAndUpdate(ticket._id, {
       isPaid: true,

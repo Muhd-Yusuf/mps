@@ -132,7 +132,7 @@ function VerifyContent() {
                 <div className="md:text-3xl text-xl font-bold tracking-wider text-foreground  mb-4 p-4 bg-background/50 rounded-xl border border-primary/20">
                   {ticket.votingCode}
                 </div>
-                <p className="text-muted-foreground text-sm">Use this code to vote and view leaderboard. Save it safely!</p>
+                <p className="text-muted-foreground text-sm">Use this code to vote. Save it safely!</p>
               </div>
             )}
 
