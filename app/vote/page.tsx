@@ -302,11 +302,6 @@ export default function VotePage() {
                     Purchase Another Ticket
                   </Button>
                 </Link>
-                <Link href="/leaderboard">
-                  <Button variant="outline" className="w-full bg-transparent" size="lg">
-                    View Leaderboard
-                  </Button>
-                </Link>
               </div>
             </CardContent>
           </Card>

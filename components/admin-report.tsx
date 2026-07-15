@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
 
+type ReportScope = "full" | "results"
+
 type ReportData = {
   teams: Team[]
   tickets: Ticket[]
@@ -91,20 +93,23 @@ function escapeCsv(value: string | number) {
   return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
 }
 
-function buildCsv(data: ReportData) {
+function buildCsv(data: ReportData, scope: ReportScope) {
   const s = summarize(data)
+  const includeRevenue = scope === "full"
   const lines: string[] = []
 
-  lines.push("MPS Media Poetry Challenge - Official Report")
+  lines.push(`MPS Media Poetry Challenge - ${includeRevenue ? "Full Statement" : "Results"}`)
   lines.push(`Generated,${escapeCsv(data.generatedAt.toLocaleString())}`)
   lines.push("")
   lines.push("Summary")
   lines.push(`Teams,${s.totalTeams}`)
   lines.push(`Participants,${s.totalParticipants}`)
   lines.push(`Total Votes,${s.totalVotes}`)
-  lines.push(`Tickets Sold,${s.ticketsSold}`)
-  lines.push(`Tickets Voted,${s.votedTickets}`)
-  lines.push(`Total Revenue,${escapeCsv(currency.format(s.revenue))}`)
+  if (includeRevenue) {
+    lines.push(`Tickets Sold,${s.ticketsSold}`)
+    lines.push(`Tickets Voted,${s.votedTickets}`)
+    lines.push(`Total Revenue,${escapeCsv(currency.format(s.revenue))}`)
+  }
   lines.push("")
   lines.push(`Rank,${escapeCsv(data.label)},Contestant,Votes`)
 
@@ -124,11 +129,12 @@ function buildCsv(data: ReportData) {
 const BRAND_INDIGO: [number, number, number] = [102, 126, 234]
 const BRAND_PURPLE: [number, number, number] = [118, 75, 162]
 
-async function buildPdf(data: ReportData) {
+async function buildPdf(data: ReportData, scope: ReportScope) {
   const { default: jsPDF } = await import("jspdf")
   const { default: autoTable } = await import("jspdf-autotable")
 
   const s = summarize(data)
+  const includeRevenue = scope === "full"
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -156,7 +162,7 @@ async function buildPdf(data: ReportData) {
     doc.text("MPS Media Poetry Challenge", 32, 13)
     doc.setFont("helvetica", "normal")
     doc.setFontSize(9)
-    doc.text("Official Results & Revenue Report", 32, 19.5)
+    doc.text(includeRevenue ? "Official Results & Revenue Statement" : "Official Results Report", 32, 19.5)
     doc.setFontSize(8)
     doc.text(`Generated: ${generated}`, pageWidth - 14, 12, { align: "right" })
 
@@ -185,9 +191,13 @@ async function buildPdf(data: ReportData) {
       ["Teams", String(s.totalTeams)],
       ["Participants", String(s.totalParticipants)],
       ["Total Votes", String(s.totalVotes)],
-      ["Tickets Sold", String(s.ticketsSold)],
-      ["Tickets Voted", String(s.votedTickets)],
-      ["Total Revenue", currency.format(s.revenue)],
+      ...(includeRevenue
+        ? [
+            ["Tickets Sold", String(s.ticketsSold)],
+            ["Tickets Voted", String(s.votedTickets)],
+            ["Total Revenue", currency.format(s.revenue)],
+          ]
+        : []),
     ],
     theme: "striped",
     headStyles: { fillColor: BRAND_INDIGO },
@@ -212,16 +222,18 @@ async function buildPdf(data: ReportData) {
 
 export default function AdminReport() {
   const [busy, setBusy] = useState<null | "csv" | "pdf">(null)
+  const [scope, setScope] = useState<ReportScope>("full")
 
   const handleGenerate = async (format: "csv" | "pdf") => {
     try {
       setBusy(format)
       const data = await loadReportData()
+      const suffix = scope === "full" ? "statement" : "results"
 
       if (format === "csv") {
-        triggerDownload(buildCsv(data), `mps-report-${fileStamp(data.generatedAt)}.csv`)
+        triggerDownload(buildCsv(data, scope), `mps-${suffix}-${fileStamp(data.generatedAt)}.csv`)
       } else {
-        await buildPdf(data)
+        await buildPdf(data, scope)
       }
 
       toast.success(`${format.toUpperCase()} report generated`)
@@ -236,9 +248,35 @@ export default function AdminReport() {
     <Card className="bg-white border-border/40 backdrop-blur">
       <CardHeader>
         <CardTitle>Generate Report</CardTitle>
-        <CardDescription>Download a full results and revenue report for the competition.</CardDescription>
+        <CardDescription>Download the competition report as a spreadsheet or branded PDF.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div>
+          <p className="text-sm font-medium text-foreground mb-2">What to include</p>
+          <div className="inline-flex rounded-lg border border-border/40 p-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={scope === "full" ? "default" : "ghost"}
+              onClick={() => setScope("full")}
+              disabled={busy !== null}
+              className={scope === "full" ? "bg-gradient-to-r from-primary to-accent" : ""}
+            >
+              Full statement (with revenue)
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={scope === "results" ? "default" : "ghost"}
+              onClick={() => setScope("results")}
+              disabled={busy !== null}
+              className={scope === "results" ? "bg-gradient-to-r from-primary to-accent" : ""}
+            >
+              Results only
+            </Button>
+          </div>
+        </div>
+
         <div className="flex flex-wrap gap-3">
           <Button
             onClick={() => handleGenerate("csv")}

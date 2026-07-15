@@ -103,14 +103,6 @@ export default function Home() {
                 Vote Now
               </Button>
             </Link>
-            <Link href="/leaderboard">
-              <Button
-                variant="outline"
-                className="border-white/30 hover:bg-white/10 bg-transparent text-white text-sm sm:text-base"
-              >
-                Leaderboard
-              </Button>
-            </Link>
           </div>
         </div>
         {/* Mobile Menu */}
@@ -129,14 +121,6 @@ export default function Home() {
                   className="w-full justify-start border-white/30 hover:bg-white/10 bg-transparent text-white text-sm sm:text-base"
                 >
                   Vote Now
-                </Button>
-              </Link>
-              <Link href="/leaderboard">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start border-white/30 hover:bg-white/10 bg-transparent text-white text-sm sm:text-base"
-                >
-                  Leaderboard
                 </Button>
               </Link>
             </div>
