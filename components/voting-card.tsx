@@ -16,14 +16,16 @@ interface VotingCardProps {
 export default function VotingCard({ participant, isSelected, onSelect, teamColor }: VotingCardProps) {
   return (
     <Card
-      className={`cursor-pointer transition-all duration-300 border-2 group overflow-hidden ${
+      className={`cursor-pointer transition-all duration-300 border group overflow-hidden rounded-xl ${
         isSelected
           ? "border-accent bg-accent/10 shadow-lg shadow-accent/20"
-          : "border-border/40 bg-card/50 hover:border-primary/30 hover:bg-card/70 hover:shadow-lg hover:shadow-primary/10"
+          : "border-border/50 bg-white hover:bg-muted/30 hover:shadow-md hover:-translate-y-0.5"
       }`}
       onClick={onSelect}
     >
-      <div className="p-5 relative">
+      {/* Slim team-color accent strip ties the participant to its team */}
+      <div className="h-1 w-full" style={{ backgroundColor: teamColor }} />
+      <div className="p-4 sm:p-5 relative">
         {/* Background accent */}
         <div
           className="absolute inset-0 opacity-0 group-hover:opacity-5 transition-opacity"

@@ -368,9 +368,20 @@ export default function VotePage() {
 
                   return (
                     <div key={team.id} className="animate-fade-in-up" style={{ animationDelay: `${teamIdx * 100}ms` }}>
-                      <Card className="bg-gradient-to-r from-primary/10 to-accent/10 border-primary/30 backdrop-blur mb-6 p-4 sm:p-6">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                          <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 border-2 border-primary/40 shadow-md">
+                      <Card
+                        className="relative overflow-hidden border-2 mb-6 p-4 sm:p-6 shadow-lg rounded-2xl"
+                        style={{
+                          borderColor: team.color,
+                          background: `linear-gradient(135deg, ${team.color}26, ${team.color}0a)`,
+                        }}
+                      >
+                        {/* Bold left accent bar in the team's own color */}
+                        <div className="absolute left-0 top-0 bottom-0 w-2" style={{ backgroundColor: team.color }} />
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 pl-2">
+                          <div
+                            className="relative w-14 h-14 rounded-full overflow-hidden flex-shrink-0 border-[3px] shadow-md"
+                            style={{ borderColor: team.color }}
+                          >
                             <Image
                               src={team.coach.image || "/placeholder.svg"}
                               alt={team.coach.name}
@@ -379,13 +390,23 @@ export default function VotePage() {
                             />
                           </div>
                           <div className="flex-1">
-                            <h3 className="text-xl sm:text-2xl font-bold text-foreground">{team.name}</h3>
-                            <p className="text-xs sm:text-sm text-muted-foreground">Coach: {team.coach.name}</p>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="inline-block w-3 h-3 rounded-full shadow"
+                                style={{ backgroundColor: team.color }}
+                              />
+                              <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
+                                {team.name}
+                              </h3>
+                            </div>
+                            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Coach: {team.coach.name}</p>
                           </div>
                           <div className="flex items-center gap-3 ml-auto">
-                            <div className="w-5 h-5 rounded-full shadow-lg" style={{ backgroundColor: team.color }} />
                             {selectedCount > 0 && (
-                              <span className="text-xs sm:text-sm font-medium px-3 py-1 rounded-full bg-accent/20 text-accent whitespace-nowrap">
+                              <span
+                                className="text-xs sm:text-sm font-semibold px-3 py-1 rounded-full text-white shadow whitespace-nowrap"
+                                style={{ backgroundColor: team.color }}
+                              >
                                 ✓ {selectedCount} Selected
                               </span>
                             )}
