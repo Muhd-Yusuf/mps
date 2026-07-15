@@ -49,15 +49,8 @@ export default function VotingCard({ participant, isSelected, onSelect, teamColo
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Heart className={`w-4 h-4 ${isSelected ? "fill-accent text-accent" : "text-muted-foreground"}`} />
-              <div>
-                <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  {participant.votes}
-                </span>
-                <span className="text-muted-foreground ml-1 text-sm">votes</span>
-              </div>
-            </div>
+            {/* Vote counts are hidden from voters so they can't see who's leading */}
+            <Heart className={`w-5 h-5 ${isSelected ? "fill-accent text-accent" : "text-muted-foreground"}`} />
             <Button
               size="sm"
               variant={isSelected ? "default" : "outline"}

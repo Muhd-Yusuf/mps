@@ -162,7 +162,7 @@ function VerifyContent() {
             <div className="flex gap-4 flex-col sm:flex-row">
               <Link href="/vote" className="flex-1">
                 <Button className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20" size="lg">
-                  Enter Code & Vote
+                  Proceed to Vote
                 </Button>
               </Link>
 

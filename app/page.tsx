@@ -129,15 +129,10 @@ export default function Home() {
       </nav>
       {/* Hero Section */}
       <div className="relative w-full flex items-center justify-center min-h-screen">
-        {/* Small screen background */}
+        {/* MPS Media logo background */}
         <div
-          className="absolute inset-0 sm:hidden bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url('https://res.cloudinary.com/doyjag1gz/image/upload/v1763512051/VOTE_1_-min_k29htv.png')` }}
-        />
-        {/* Larger screen background */}
-        <div
-          className="absolute inset-0 hidden sm:block bg-contain bg-center bg-no-repeat"
-          style={{ backgroundImage: `url('https://res.cloudinary.com/doyjag1gz/image/upload/v1763510826/VOTE-min_fpp6di.png')` }}
+          className="absolute inset-0 bg-contain bg-center bg-no-repeat"
+          style={{ backgroundImage: `url('https://res.cloudinary.com/doyjag1gz/image/upload/v1763647363/4_chleoz.png')` }}
         />
 
         {/* Overlay for better text readability */}
