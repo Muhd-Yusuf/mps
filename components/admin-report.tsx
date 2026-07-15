@@ -12,6 +12,7 @@ import { Spinner } from "@/components/ui/spinner"
 type ReportData = {
   teams: Team[]
   tickets: Ticket[]
+  label: string
   generatedAt: Date
 }
 
@@ -23,9 +24,10 @@ const currency = new Intl.NumberFormat("en-NG", {
 })
 
 async function loadReportData(): Promise<ReportData> {
-  const [teamsRes, paymentsRes] = await Promise.all([
+  const [teamsRes, paymentsRes, labelRes] = await Promise.all([
     fetch("/api/teams", { cache: "no-store" }),
     fetch("/api/payments", { cache: "no-store" }),
+    fetch("/api/settings/label", { cache: "no-store" }),
   ])
 
   if (!teamsRes.ok) throw new Error("Failed to load teams")
@@ -38,7 +40,12 @@ async function loadReportData(): Promise<ReportData> {
     tickets = paymentsData?.tickets ?? []
   }
 
-  return { teams, tickets, generatedAt: new Date() }
+  let label = "Team"
+  if (labelRes.ok) {
+    label = (await labelRes.json())?.label || "Team"
+  }
+
+  return { teams, tickets, label, generatedAt: new Date() }
 }
 
 function summarize({ teams, tickets }: ReportData) {
@@ -88,7 +95,7 @@ function buildCsv(data: ReportData) {
   const s = summarize(data)
   const lines: string[] = []
 
-  lines.push("MPS Poetry Challenge - Report")
+  lines.push("MPS Media Poetry Challenge - Official Report")
   lines.push(`Generated,${escapeCsv(data.generatedAt.toLocaleString())}`)
   lines.push("")
   lines.push("Summary")
@@ -99,7 +106,7 @@ function buildCsv(data: ReportData) {
   lines.push(`Tickets Voted,${s.votedTickets}`)
   lines.push(`Total Revenue,${escapeCsv(currency.format(s.revenue))}`)
   lines.push("")
-  lines.push("Rank,Team,Contestant,Votes")
+  lines.push(`Rank,${escapeCsv(data.label)},Contestant,Votes`)
 
   s.participants
     .slice()
@@ -114,22 +121,65 @@ function buildCsv(data: ReportData) {
   return new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" })
 }
 
+const BRAND_INDIGO: [number, number, number] = [102, 126, 234]
+const BRAND_PURPLE: [number, number, number] = [118, 75, 162]
+
 async function buildPdf(data: ReportData) {
   const { default: jsPDF } = await import("jspdf")
   const { default: autoTable } = await import("jspdf-autotable")
 
   const s = summarize(data)
   const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const generated = data.generatedAt.toLocaleString()
 
-  doc.setFontSize(16)
-  doc.text("MPS Poetry Challenge - Report", 14, 18)
-  doc.setFontSize(10)
-  doc.setTextColor(120)
-  doc.text(`Generated: ${data.generatedAt.toLocaleString()}`, 14, 25)
-  doc.setTextColor(0)
+  // Branded header banner + footer, redrawn on every page.
+  const drawBranding = (pageNumber: number) => {
+    doc.setFillColor(BRAND_INDIGO[0], BRAND_INDIGO[1], BRAND_INDIGO[2])
+    doc.rect(0, 0, pageWidth, 26, "F")
+    doc.setFillColor(BRAND_PURPLE[0], BRAND_PURPLE[1], BRAND_PURPLE[2])
+    doc.rect(0, 26, pageWidth, 1.6, "F")
+
+    // "MPS" logo badge
+    doc.setFillColor(255, 255, 255)
+    doc.roundedRect(14, 6.5, 13, 13, 2, 2, "F")
+    doc.setTextColor(BRAND_INDIGO[0], BRAND_INDIGO[1], BRAND_INDIGO[2])
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(9)
+    doc.text("MPS", 20.5, 14.5, { align: "center" })
+
+    // Title + tagline
+    doc.setTextColor(255, 255, 255)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(15)
+    doc.text("MPS Media Poetry Challenge", 32, 13)
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(9)
+    doc.text("Official Results & Revenue Report", 32, 19.5)
+    doc.setFontSize(8)
+    doc.text(`Generated: ${generated}`, pageWidth - 14, 12, { align: "right" })
+
+    // Footer
+    doc.setDrawColor(BRAND_INDIGO[0], BRAND_INDIGO[1], BRAND_INDIGO[2])
+    doc.setLineWidth(0.3)
+    doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12)
+    doc.setTextColor(130, 130, 130)
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(8)
+    doc.text("MPS Media Poetry Challenge", 14, pageHeight - 7)
+    doc.text(`Page ${pageNumber}`, pageWidth - 14, pageHeight - 7, { align: "right" })
+    doc.setTextColor(0, 0, 0)
+  }
+
+  const pageOpts = {
+    margin: { top: 34, bottom: 16 },
+    didDrawPage: (d: any) => drawBranding(d.pageNumber),
+  }
 
   autoTable(doc, {
-    startY: 32,
+    ...pageOpts,
+    startY: 36,
     head: [["Summary", ""]],
     body: [
       ["Teams", String(s.totalTeams)],
@@ -140,7 +190,7 @@ async function buildPdf(data: ReportData) {
       ["Total Revenue", currency.format(s.revenue)],
     ],
     theme: "striped",
-    headStyles: { fillColor: [102, 126, 234] },
+    headStyles: { fillColor: BRAND_INDIGO },
   })
 
   const ranked = s.participants
@@ -149,11 +199,12 @@ async function buildPdf(data: ReportData) {
     .map((p, index) => [String(index + 1), p.team, p.name, String(p.votes)])
 
   autoTable(doc, {
+    ...pageOpts,
     startY: (doc as any).lastAutoTable.finalY + 8,
-    head: [["Rank", "Team", "Contestant", "Votes"]],
+    head: [["Rank", data.label, "Contestant", "Votes"]],
     body: ranked,
     theme: "striped",
-    headStyles: { fillColor: [118, 75, 162] },
+    headStyles: { fillColor: BRAND_PURPLE },
   })
 
   doc.save(`mps-report-${fileStamp(data.generatedAt)}.pdf`)

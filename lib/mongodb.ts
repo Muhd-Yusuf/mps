@@ -76,9 +76,9 @@ const ticketSchema = new Schema(
     isPaid: { type: Boolean, default: false },
     paystackReference: { type: String, trim: true },
     hasVoted: { type: Boolean, default: false },
-    // The team/round that was open when this ticket was bought. A ticket belongs
-    // to one round: one per email per round, and only votable in that round.
-    roundTeamId: { type: String, trim: true },
+    // The competition round this ticket was bought for. One ticket per email per
+    // round, and a ticket can only be used to vote while that round is current.
+    round: { type: Number },
     paidAt: { type: Date },
     paymentMetadata: { type: Schema.Types.Mixed },
   },

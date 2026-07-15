@@ -547,7 +547,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
       toast({
         title: nextOpen ? "Voting opened" : "Voting closed",
         description: nextOpen
-          ? `${team.name} is now open for voting. Other teams were closed.`
+          ? `${team.name} is now open for voting.`
           : `${team.name} is now closed for voting.`,
       })
       await onRefresh?.()

@@ -18,11 +18,16 @@ export default function LeaderboardPage() {
   const [participants, setParticipants] = useState<Participant[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [teamLabel, setTeamLabel] = useState("Team")
 
   const fetchTeams = useCallback(async () => {
     try {
       setIsLoading(true)
       setLoadError(null)
+      fetch("/api/settings/label", { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => data?.label && setTeamLabel(data.label))
+        .catch(() => {})
       const response = await fetch("/api/teams", { cache: "no-store" })
       if (!response.ok) {
         throw new Error("Failed to load teams")
@@ -205,7 +210,7 @@ export default function LeaderboardPage() {
             <TrendingUp className="w-6 sm:w-8 h-6 sm:h-8 text-primary" />
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">Live Leaderboard</h1>
           </div>
-          <p className="text-sm sm:text-base text-muted-foreground">Real-time voting results across all teams</p>
+          <p className="text-sm sm:text-base text-muted-foreground">Real-time voting results across all {teamLabel.toLowerCase()}s</p>
         </div>
 
         {isLoading && (

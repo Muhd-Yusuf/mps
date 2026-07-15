@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import https from "https"
 
-import { connectToDatabase, TicketModel, TeamModel } from "@/lib/mongodb"
+import { connectToDatabase, TicketModel, TeamModel, SettingModel } from "@/lib/mongodb"
 import { generateVotingCode } from "@/lib/code-utils"
 
 const initializeSchema = z.object({
@@ -74,23 +74,25 @@ export async function POST(request: Request) {
 
     await connectToDatabase()
 
-    // Tickets are per-round. A round is whichever team is currently open for voting.
-    const openTeam = await TeamModel.findOne({ votingOpen: true })
-    if (!openTeam) {
+    // A ticket can only be useful if there is at least one team open to vote for.
+    const openTeamCount = await TeamModel.countDocuments({ votingOpen: true })
+    if (openTeamCount === 0) {
       return NextResponse.json(
         { error: "Voting is not open right now. Please wait for the next round." },
         { status: 409 }
       )
     }
-    const roundTeamId = openTeam._id.toString()
 
-    // One ticket per email per round: block only if this email already has a paid
-    // ticket for the current open round (a new round frees them to buy again).
+    // Tickets belong to the current round. Admin advances the round to reset limits.
+    const roundSetting = await SettingModel.findOne({ key: "current_round" }).lean()
+    const round = roundSetting ? parseInt(roundSetting.value, 10) || 1 : 1
+
+    // One ticket per email per round: a new round frees the same email to buy again.
     const normalizedEmail = parsed.data.email.toLowerCase().trim()
     const existingPaidTicket = await TicketModel.findOne({
       email: normalizedEmail,
       isPaid: true,
-      roundTeamId,
+      round,
     })
     if (existingPaidTicket) {
       return NextResponse.json(
@@ -117,7 +119,7 @@ export async function POST(request: Request) {
       votingCode,
       amount: parsed.data.amount,
       isPaid: false,
-      roundTeamId,
+      round,
     })
 
     // Initialize Paystack payment

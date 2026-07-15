@@ -36,6 +36,10 @@ export async function POST(request: Request) {
     const setting = await SettingModel.findOne({ key: "max_votes_per_ticket" }).lean()
     const maxVotes = setting ? parseInt(setting.value, 10) : 3 // Default to 3
 
+    // Current round: a ticket may only be used to vote in the round it was bought for.
+    const roundSetting = await SettingModel.findOne({ key: "current_round" }).lean()
+    const currentRound = roundSetting ? parseInt(roundSetting.value, 10) || 1 : 1
+
     if (parsed.data.selections.length > maxVotes) {
       return NextResponse.json({
         error: `You can only vote for up to ${maxVotes} contestants`
@@ -65,6 +69,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This voting code has already been used" }, { status: 400 })
     }
 
+    // A ticket bought in an earlier round can't be used once a new round has started.
+    if (ticket.round !== undefined && ticket.round !== null && ticket.round !== currentRound) {
+      return NextResponse.json(
+        { error: "This voting code was for a previous round and can no longer be used" },
+        { status: 400 }
+      )
+    }
+
     // Verify all teams and participants exist
     const teamIds = [...new Set(parsed.data.selections.map(s => s.teamId))].map((id) => {
       try {
@@ -85,14 +97,6 @@ export async function POST(request: Request) {
 
       if (!team.votingOpen) {
         return NextResponse.json({ error: `Voting for ${team.name} is not open` }, { status: 400 })
-      }
-
-      // A ticket may only vote in its own round (older tickets can't carry over).
-      if (ticket.roundTeamId && ticket.roundTeamId !== selection.teamId) {
-        return NextResponse.json(
-          { error: "This voting code is not valid for the current round" },
-          { status: 400 }
-        )
       }
 
       const participant = team.participants?.find((p: any) => p._id.toString() === selection.participantId)

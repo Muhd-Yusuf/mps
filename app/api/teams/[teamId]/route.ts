@@ -118,7 +118,7 @@ const patchSchema = z.object({
 })
 
 // Partial update that never touches participants/votes. Used to open/close a team
-// for voting (only one team may be open at a time) or set its ordering.
+// for voting (any number of teams may be open at once) or set its ordering.
 export async function PATCH(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
   const { teamId } = await params
 
@@ -135,11 +135,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
     }
 
     await connectToDatabase()
-
-    // Opening a team closes every other team so only one round is ever live.
-    if (parsed.data.votingOpen === true) {
-      await TeamModel.updateMany({ _id: { $ne: teamId } }, { $set: { votingOpen: false } })
-    }
 
     const update: Record<string, unknown> = {}
     if (parsed.data.votingOpen !== undefined) update.votingOpen = parsed.data.votingOpen

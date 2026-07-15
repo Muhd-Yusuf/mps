@@ -26,14 +26,16 @@ export default function VotePage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isSubmittingVotes, setIsSubmittingVotes] = useState(false)
   const [maxVotes, setMaxVotes] = useState(3)
+  const [teamLabel, setTeamLabel] = useState("Team")
 
   const fetchTeams = useCallback(async () => {
     try {
       setIsLoading(true)
       setLoadError(null)
-      const [teamsResponse, settingsResponse] = await Promise.all([
+      const [teamsResponse, settingsResponse, labelResponse] = await Promise.all([
         fetch("/api/teams", { cache: "no-store" }),
-        fetch("/api/settings", { cache: "no-store" })
+        fetch("/api/settings", { cache: "no-store" }),
+        fetch("/api/settings/label", { cache: "no-store" })
       ])
 
       if (!teamsResponse.ok) {
@@ -43,6 +45,11 @@ export default function VotePage() {
       if (settingsResponse.ok) {
         const settingsData = await settingsResponse.json()
         setMaxVotes(settingsData.maxVotes)
+      }
+
+      if (labelResponse.ok) {
+        const labelData = await labelResponse.json()
+        setTeamLabel(labelData.label || "Team")
       }
 
       const data = await teamsResponse.json()
@@ -355,7 +362,7 @@ export default function VotePage() {
                   Select Your Votes
                 </h2>
                 <p className="text-sm sm:text-base text-muted-foreground">
-                  Choose one participant from each team to advance to the next stage.
+                  Choose one participant from each {teamLabel.toLowerCase()} to advance to the next stage.
                 </p>
               </div>
 
