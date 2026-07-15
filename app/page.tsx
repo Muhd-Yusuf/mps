@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowRight, Sparkles, Users, TrendingUp, Menu, X } from "lucide-react"
-import { PartnersCarousel } from "@/components/partners-carousel"
+// import { PartnersCarousel } from "@/components/partners-carousel"
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -157,8 +157,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Partners Section */}
-      <PartnersCarousel />
+      {/* Partners Section — hidden for now */}
+      {/* <PartnersCarousel /> */}
 
 
       <footer className="py-8 text-center text-muted-foreground">
