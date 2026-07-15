@@ -103,7 +103,7 @@ function buildCsv(data: ReportData, scope: ReportScope) {
   lines.push("")
   lines.push("Summary")
   lines.push(`Teams,${s.totalTeams}`)
-  lines.push(`Participants,${s.totalParticipants}`)
+  lines.push(`Poets,${s.totalParticipants}`)
   lines.push(`Total Votes,${s.totalVotes}`)
   if (includeRevenue) {
     lines.push(`Tickets Sold,${s.ticketsSold}`)
@@ -189,7 +189,7 @@ async function buildPdf(data: ReportData, scope: ReportScope) {
     head: [["Summary", ""]],
     body: [
       ["Teams", String(s.totalTeams)],
-      ["Participants", String(s.totalParticipants)],
+      ["Poets", String(s.totalParticipants)],
       ["Total Votes", String(s.totalVotes)],
       ...(includeRevenue
         ? [

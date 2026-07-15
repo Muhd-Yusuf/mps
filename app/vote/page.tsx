@@ -351,7 +351,7 @@ export default function VotePage() {
                   Select Your Votes
                 </h2>
                 <p className="text-sm sm:text-base text-muted-foreground">
-                  Choose one participant from each {teamLabel.toLowerCase()} to advance to the next stage.
+                  Choose one poet from each {teamLabel.toLowerCase()} to advance to the next stage.
                 </p>
               </div>
 

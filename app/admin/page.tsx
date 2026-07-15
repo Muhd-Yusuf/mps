@@ -144,7 +144,7 @@ export default function AdminPage() {
   const stats = [
     { label: "Total Votes", value: totalVotes },
     { label: "Teams", value: teams.length },
-    { label: "Participants", value: totalParticipants },
+    { label: "Poets", value: totalParticipants },
     { label: "Total Revenue", value: formattedTotalRevenue },
   ]
 
@@ -275,7 +275,7 @@ export default function AdminPage() {
                 Charts & Analytics
               </TabsTrigger>
               <TabsTrigger value="teams" className="data-[state=active]:bg-primary/20">
-                Teams & Participants
+                Teams & Poets
               </TabsTrigger>
               <TabsTrigger value="revenue" className="data-[state=active]:bg-primary/20">
                 Revenue

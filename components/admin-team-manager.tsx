@@ -336,7 +336,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
     const filtered = participantRows.filter((participant) => participant.name.trim().length)
 
     if (!addParticipantDialog.teamId || !filtered.length) {
-      toast({ title: "Add participant details", description: "Include at least one participant name." })
+      toast({ title: "Add poet details", description: "Include at least one poet name." })
       return
     }
 
@@ -356,18 +356,18 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
-        throw new Error(error?.error ?? "Unable to add participants")
+        throw new Error(error?.error ?? "Unable to add poets")
       }
 
       toast({
-        title: "Participants added",
-        description: `${filtered.length} participant(s) added to ${selectedTeam?.name ?? "the team"}.`,
+        title: "Poets added",
+        description: `${filtered.length} poet(s) added to ${selectedTeam?.name ?? "the team"}.`,
       })
       setAddParticipantDialog({ open: false, teamId: "" })
       await onRefresh?.()
     } catch (error: any) {
       toast({
-        title: "Failed to add participants",
+        title: "Failed to add poets",
         description: error?.message ?? "Please try again later",
         variant: "destructive",
       })
@@ -600,7 +600,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
       <Card className="border-border/40 bg-white backdrop-blur">
             <CardHeader>
           <CardTitle>Add a New Team</CardTitle>
-          <CardDescription>Create teams, assign a coach, and preload participants.</CardDescription>
+          <CardDescription>Create teams, assign a coach, and preload poets.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-6" onSubmit={handleCreateTeam}>
@@ -705,14 +705,14 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold uppercase text-muted-foreground">Participants</h3>
+                  <h3 className="text-sm font-semibold uppercase text-muted-foreground">Poets</h3>
                   <p className="text-xs text-muted-foreground">
-                    Optional: preload participants for this team. You can add more later.
+                    Optional: preload poets for this team. You can add more later.
                   </p>
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={addParticipantDraftRow}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Participant
+                  Add Poet
                 </Button>
               </div>
 
@@ -725,16 +725,16 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                         id={`participant-name-${index}`}
                         value={participant.name}
                         onChange={(event) => handleParticipantDraftChange(index, "name", event.target.value)}
-                        placeholder="Participant name"
+                        placeholder="Poet name"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`participant-image-${index}`}>Participant Photo</Label>
+                      <Label htmlFor={`participant-image-${index}`}>Poet Photo</Label>
                       <div className="flex flex-col gap-3">
                         <div className="flex items-center gap-3">
                           <div className="relative h-12 w-12 overflow-hidden rounded-full border border-border/40 bg-muted">
                             {participant.image ? (
-                              <Image src={participant.image} alt={`${participant.name || "Participant"} photo`} fill className="object-cover" />
+                              <Image src={participant.image} alt={`${participant.name || "Poet"} photo`} fill className="object-cover" />
                             ) : (
                               <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">No photo</div>
                             )}
@@ -766,7 +766,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                             </div>
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground">Upload participant headshot.</p>
+                        <p className="text-xs text-muted-foreground">Upload poet headshot.</p>
                       </div>
                     </div>
                   </div>
@@ -816,7 +816,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                   <div>
                     <CardTitle className="text-foreground">{team.name}</CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        Coach: {team.coach?.name ?? "Unknown"} • {teamParticipants.length} participant
+                        Coach: {team.coach?.name ?? "Unknown"} • {teamParticipants.length} poet
                         {teamParticipants.length === 1 ? "" : "s"}
                     </CardDescription>
                     </div>
@@ -853,7 +853,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                       className="border-border/40 hover:bg-muted"
                     >
                       <UserPlus className="mr-2 h-4 w-4" />
-                      Add Participant
+                      Add Poet
                     </Button>
                     <Button
                       variant="outline"
@@ -872,7 +872,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
               <div className="space-y-3">
                   {teamParticipants.length === 0 && (
                     <div className="rounded-lg border border-dashed border-border/40 p-4 text-center text-sm text-muted-foreground">
-                      No participants yet. Use the button above to add the first participant.
+                      No poets yet. Use the button above to add the first poet.
                     </div>
                   )}
                 {teamParticipants.map((participant) => (
@@ -914,9 +914,9 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Participants</DialogTitle>
+            <DialogTitle>Add Poets</DialogTitle>
             <DialogDescription>
-              Add one or more participants to {selectedTeam?.name ?? "the selected team"}.
+              Add one or more poets to {selectedTeam?.name ?? "the selected team"}.
             </DialogDescription>
           </DialogHeader>
 
@@ -924,20 +924,20 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
             {participantRows.map((participant, index) => (
               <div key={`dialog-participant-${index}`} className="space-y-3 rounded-md border border-border/40 p-4">
                 <div className="space-y-2">
-                  <Label htmlFor={`dialog-participant-name-${index}`}>Participant Name</Label>
+                  <Label htmlFor={`dialog-participant-name-${index}`}>Poet Name</Label>
                   <Input
                     id={`dialog-participant-name-${index}`}
                     value={participant.name}
                     onChange={(event) => handleParticipantRowsChange(index, "name", event.target.value)}
-                    placeholder="Participant name"
+                    placeholder="Poet name"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={`dialog-participant-image-${index}`}>Participant Photo</Label>
+                  <Label htmlFor={`dialog-participant-image-${index}`}>Poet Photo</Label>
                   <div className="flex items-center gap-3">
                     <div className="relative h-12 w-12 overflow-hidden rounded-full border border-border/40 bg-muted">
                       {participant.image ? (
-                        <Image src={participant.image} alt={`${participant.name || "Participant"} photo`} fill className="object-cover" />
+                        <Image src={participant.image} alt={`${participant.name || "Poet"} photo`} fill className="object-cover" />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">No photo</div>
                       )}
@@ -974,7 +974,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
             ))}
             <Button type="button" variant="outline" className="w-full" onClick={addParticipantRow}>
               <Plus className="mr-2 h-4 w-4" />
-              Add another participant
+              Add another poet
             </Button>
           </div>
 
@@ -984,7 +984,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
             </Button>
             <Button onClick={handleAddParticipants} disabled={isAddingParticipants}>
               {isAddingParticipants ? <Spinner size="sm" className="mr-2" /> : <UserPlus className="mr-2 h-4 w-4" />}
-              {isAddingParticipants ? "Saving..." : "Save Participants"}
+              {isAddingParticipants ? "Saving..." : "Save Poets"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -999,7 +999,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Team</DialogTitle>
-            <DialogDescription>Update team information, coach details, and participants.</DialogDescription>
+            <DialogDescription>Update team information, coach details, and poets.</DialogDescription>
           </DialogHeader>
 
           <form className="space-y-6" onSubmit={handleUpdateTeam}>
@@ -1100,12 +1100,12 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold uppercase text-muted-foreground">Participants</h3>
-                  <p className="text-xs text-muted-foreground">Update participant information for this team.</p>
+                  <h3 className="text-sm font-semibold uppercase text-muted-foreground">Poets</h3>
+                  <p className="text-xs text-muted-foreground">Update poet information for this team.</p>
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={addEditParticipantDraftRow}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Participant
+                  Add Poet
                 </Button>
               </div>
 
@@ -1118,16 +1118,16 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                         id={`edit-participant-name-${index}`}
                         value={participant.name}
                         onChange={(event) => handleEditParticipantDraftChange(index, "name", event.target.value)}
-                        placeholder="Participant name"
+                        placeholder="Poet name"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`edit-participant-image-${index}`}>Participant Photo</Label>
+                      <Label htmlFor={`edit-participant-image-${index}`}>Poet Photo</Label>
                       <div className="flex flex-col gap-3">
                         <div className="flex items-center gap-3">
                           <div className="relative h-12 w-12 overflow-hidden rounded-full border border-border/40 bg-muted">
                             {participant.image ? (
-                              <Image src={participant.image} alt={`${participant.name || "Participant"} photo`} fill className="object-cover" />
+                              <Image src={participant.image} alt={`${participant.name || "Poet"} photo`} fill className="object-cover" />
                             ) : (
                               <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">No photo</div>
                             )}

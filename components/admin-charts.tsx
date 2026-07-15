@@ -173,9 +173,9 @@ export default function AdminCharts({ teams, isLoading }: AdminChartsProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-primary" />
-            Top 10 Participants
+            Top 10 Poets
           </CardTitle>
-          <CardDescription>Highest voted participants across all teams</CardDescription>
+          <CardDescription>Highest voted poets across all teams</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>

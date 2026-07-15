@@ -66,7 +66,7 @@ export default function AdminVotingResults({ teams, isLoading }: AdminVotingResu
             <CardContent>
               <div className="space-y-4">
                 {teamParticipants.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No participants yet for this team.</p>
+                  <p className="text-sm text-muted-foreground">No poets yet for this team.</p>
                 )}
                 {teamParticipants.map((participant, index) => {
                   const votes = participant.votes ?? 0
