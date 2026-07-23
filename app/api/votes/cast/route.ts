@@ -4,24 +4,22 @@ import mongoose from "mongoose"
 
 import { connectToDatabase, TicketModel, VoteModel, TeamModel, SettingModel } from "@/lib/mongodb"
 
-const voteSchema = z.object({
-  votingCode: z.string().min(1, "Voting code is required"),
-  selections: z.record(z.string(), z.string()).refine((data) => Object.keys(data).length > 0, {
-    message: "At least one selection is required",
-  }),
-})
-
 export async function POST(request: Request) {
   try {
     const payload = await request.json()
 
-    // Define schema here to handle the new structure
+    // One ticket = one vote, in every stage. The array shape is kept for
+    // backwards compatibility with the client, but exactly one pick is allowed.
     const voteSchema = z.object({
       votingCode: z.string().min(1, "Voting code is required"),
-      selections: z.array(z.object({
-        teamId: z.string(),
-        participantId: z.string()
-      })).min(1, "At least one selection is required")
+      selections: z
+        .array(
+          z.object({
+            teamId: z.string(),
+            participantId: z.string(),
+          })
+        )
+        .length(1, "Select exactly one poet to vote for"),
     })
 
     const parsed = voteSchema.safeParse(payload)
@@ -36,13 +34,9 @@ export async function POST(request: Request) {
     const roundSetting = await SettingModel.findOne({ key: "current_round" }).lean()
     const currentRound = roundSetting ? parseInt(roundSetting.value, 10) || 1 : 1
 
-    // Votes are bounded by "one contestant per open team", not a fixed count — a voter
-    // picks one contestant from each open team (100 open teams => up to 100 picks).
-    // One contestant per team: reject duplicate teams in the same submission.
-    const selectionTeamIds = parsed.data.selections.map((s) => s.teamId)
-    if (new Set(selectionTeamIds).size !== selectionTeamIds.length) {
-      return NextResponse.json({ error: "You can only vote for one contestant per team" }, { status: 400 })
-    }
+    // Stage mode: "teams" (regular team voting) or "danger" (blind-audition save vote).
+    const modeSetting = await SettingModel.findOne({ key: "voting_mode" }).lean()
+    const votingMode = modeSetting?.value === "danger" ? "danger" : "teams"
 
     // Verify ticket
     const ticket = await TicketModel.findOne({
@@ -69,31 +63,34 @@ export async function POST(request: Request) {
       )
     }
 
-    // Verify all teams and participants exist
-    const teamIds = [...new Set(parsed.data.selections.map(s => s.teamId))].map((id) => {
-      try {
-        return new mongoose.Types.ObjectId(id)
-      } catch {
-        return null
+    const selection = parsed.data.selections[0]
+
+    let teamObjectId: mongoose.Types.ObjectId
+    try {
+      teamObjectId = new mongoose.Types.ObjectId(selection.teamId)
+    } catch {
+      return NextResponse.json({ error: "Invalid team" }, { status: 400 })
+    }
+
+    const team = await TeamModel.findById(teamObjectId)
+    if (!team) {
+      return NextResponse.json({ error: "Team not found" }, { status: 400 })
+    }
+
+    const participant = team.participants?.find((p: any) => p._id.toString() === selection.participantId)
+    if (!participant) {
+      return NextResponse.json({ error: "Poet not found" }, { status: 400 })
+    }
+
+    if (votingMode === "danger") {
+      // Danger Zone: only poets not chosen by any coach are votable, regardless
+      // of whether their original team is open.
+      if (!participant.inDanger) {
+        return NextResponse.json({ error: "This poet is not in the Danger Zone vote" }, { status: 400 })
       }
-    }).filter(Boolean) as mongoose.Types.ObjectId[]
-
-    const teams = await TeamModel.find({ _id: { $in: teamIds } })
-
-    // Verify participants belong to their teams and that each team is open for voting.
-    for (const selection of parsed.data.selections) {
-      const team = teams.find((t) => t._id.toString() === selection.teamId)
-      if (!team) {
-        return NextResponse.json({ error: `Team ${selection.teamId} not found` }, { status: 400 })
-      }
-
+    } else {
       if (!team.votingOpen) {
         return NextResponse.json({ error: `Voting for ${team.name} is not open` }, { status: 400 })
-      }
-
-      const participant = team.participants?.find((p: any) => p._id.toString() === selection.participantId)
-      if (!participant) {
-        return NextResponse.json({ error: `Participant ${selection.participantId} not found in team ${selection.teamId}` }, { status: 400 })
       }
     }
 
@@ -108,37 +105,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This voting code has already been used" }, { status: 400 })
     }
 
-    // Create votes
-    const votes = await Promise.all(
-      parsed.data.selections.map(({ teamId, participantId }) =>
-        VoteModel.create({
-          ticketId: ticket._id,
-          participantId,
-          teamId,
-        })
-      )
-    )
+    await VoteModel.create({
+      ticketId: ticket._id,
+      participantId: selection.participantId,
+      teamId: selection.teamId,
+    })
 
-    // Update participant vote counts
-    for (const { teamId, participantId } of parsed.data.selections) {
-      try {
-        await TeamModel.updateOne(
-          { _id: new mongoose.Types.ObjectId(teamId), "participants._id": new mongoose.Types.ObjectId(participantId) },
-          { $inc: { "participants.$.votes": 1 } }
-        )
-      } catch (error) {
-        console.error(`Failed to update votes for team ${teamId}, participant ${participantId}:`, error)
-      }
-    }
+    await TeamModel.updateOne(
+      { _id: teamObjectId, "participants._id": new mongoose.Types.ObjectId(selection.participantId) },
+      { $inc: { "participants.$.votes": 1 } }
+    )
 
     return NextResponse.json({
       success: true,
-      message: "Votes cast successfully",
-      votesCount: votes.length,
+      message: "Vote cast successfully",
+      votesCount: 1,
     })
   } catch (error: any) {
     console.error("[CAST_VOTE_ERROR]", error)
-    return NextResponse.json({ error: error?.message ?? "Failed to cast votes" }, { status: 500 })
+    return NextResponse.json({ error: error?.message ?? "Failed to cast vote" }, { status: 500 })
   }
 }
-
