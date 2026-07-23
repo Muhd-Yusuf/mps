@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Image from "next/image"
-import { Plus, UserPlus, Trash2, Edit2, Radio } from "lucide-react"
+import { Plus, UserPlus, Trash2, Edit2, Radio, Flame } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 
 import type { Team, Participant } from "@/lib/types"
@@ -96,6 +96,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
   })
   const [isDeletingTeam, setIsDeletingTeam] = useState(false)
   const [togglingTeamId, setTogglingTeamId] = useState<string | null>(null)
+  const [togglingDangerId, setTogglingDangerId] = useState<string | null>(null)
 
   const teamOptions = useMemo(() => teams ?? [], [teams])
 
@@ -562,6 +563,41 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
     }
   }
 
+  // Blind audition: flag poets no coach picked so they appear in the public
+  // Danger Zone save vote (random list, no team grouping).
+  const handleToggleDanger = async (team: Team, participant: Participant) => {
+    const nextInDanger = !participant.inDanger
+    try {
+      setTogglingDangerId(participant.id)
+      const response = await fetch(`/api/teams/${team.id}/participants/${participant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inDanger: nextInDanger }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error?.error ?? "Unable to update Danger Zone status")
+      }
+
+      toast({
+        title: nextInDanger ? "Added to Danger Zone" : "Removed from Danger Zone",
+        description: nextInDanger
+          ? `${participant.name} will appear in the Danger Zone save vote.`
+          : `${participant.name} is no longer in the Danger Zone.`,
+      })
+      await onRefresh?.()
+    } catch (error: any) {
+      toast({
+        title: "Failed to update Danger Zone status",
+        description: error?.message ?? "Please try again later",
+        variant: "destructive",
+      })
+    } finally {
+      setTogglingDangerId(null)
+    }
+  }
+
   const openDeleteDialog = (team: Team) => {
     setDeleteDialog({ open: true, teamId: team.id, teamName: team.name })
   }
@@ -891,9 +927,32 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                           <p className="text-sm text-muted-foreground">{participant.votes ?? 0} votes</p>
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-foreground">
-                        {participant.votes && participant.votes > 0 ? "Competing" : "New"}
-                    </Badge>
+                      <div className="flex items-center gap-2">
+                        {participant.inDanger && (
+                          <Badge className="bg-red-600 text-white hover:bg-red-600">Danger Zone</Badge>
+                        )}
+                        <Badge variant="outline" className="text-foreground">
+                          {participant.votes && participant.votes > 0 ? "Competing" : "New"}
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleToggleDanger(team, participant)}
+                          disabled={togglingDangerId === participant.id}
+                          className={
+                            participant.inDanger
+                              ? "border-red-600/50 text-red-600 hover:bg-red-50 hover:border-red-600"
+                              : "border-border/40 hover:bg-muted"
+                          }
+                        >
+                          {togglingDangerId === participant.id ? (
+                            <Spinner size="sm" className="mr-2" />
+                          ) : (
+                            <Flame className="mr-2 h-4 w-4" />
+                          )}
+                          {participant.inDanger ? "Remove from Danger" : "Danger Zone"}
+                        </Button>
+                      </div>
                   </div>
                 ))}
               </div>

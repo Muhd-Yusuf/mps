@@ -6,14 +6,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
-import { Save, RotateCw, Tag } from "lucide-react"
+import { Save, RotateCw, Tag, Flame, Users } from "lucide-react"
+
+type VotingMode = "teams" | "danger"
 
 export default function AdminSettings() {
     const [teamLabel, setTeamLabel] = useState<string>("Team")
     const [round, setRound] = useState<number>(1)
+    const [mode, setMode] = useState<VotingMode>("teams")
     const [isLoading, setIsLoading] = useState(true)
     const [isSavingLabel, setIsSavingLabel] = useState(false)
     const [isAdvancing, setIsAdvancing] = useState(false)
+    const [isSavingMode, setIsSavingMode] = useState(false)
 
     useEffect(() => {
         fetchSettings()
@@ -22,17 +26,47 @@ export default function AdminSettings() {
     const fetchSettings = async () => {
         try {
             setIsLoading(true)
-            const [labelRes, roundRes] = await Promise.all([
+            const [labelRes, roundRes, modeRes] = await Promise.all([
                 fetch("/api/settings/label"),
                 fetch("/api/settings/round"),
+                fetch("/api/settings/mode"),
             ])
             if (labelRes.ok) setTeamLabel((await labelRes.json()).label)
             if (roundRes.ok) setRound((await roundRes.json()).round)
+            if (modeRes.ok) setMode((await modeRes.json()).mode === "danger" ? "danger" : "teams")
         } catch (error) {
             toast.error("Error loading settings")
             console.error(error)
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    const handleSetMode = async (nextMode: VotingMode) => {
+        if (nextMode === mode) return
+        const message =
+            nextMode === "danger"
+                ? "Switch to the Danger Zone stage? Voters will see the poets you flagged as Danger Zone in one random list — team voting stops."
+                : "Switch back to Team Voting? The Danger Zone list is hidden and open teams become votable again."
+        if (!confirm(message)) return
+        try {
+            setIsSavingMode(true)
+            const response = await fetch("/api/settings/mode", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mode: nextMode }),
+            })
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || "Failed to switch stage")
+            }
+            const data = await response.json()
+            setMode(data.mode)
+            toast.success(data.mode === "danger" ? "Danger Zone stage is now live" : "Team Voting stage is now live")
+        } catch (error: any) {
+            toast.error(error.message || "Error switching stage")
+        } finally {
+            setIsSavingMode(false)
         }
     }
 
@@ -96,6 +130,46 @@ export default function AdminSettings() {
             <Card className="bg-white border-border/40 backdrop-blur shadow-sm">
                 <CardHeader>
                     <div className="flex items-center gap-2">
+                        <Flame className="w-5 h-5 text-red-600" />
+                        <CardTitle>Competition Stage</CardTitle>
+                    </div>
+                    <CardDescription>
+                        Each stage is unique. <strong>Team Voting</strong> shows poets grouped under their open teams.{" "}
+                        <strong>Danger Zone</strong> is the blind-audition save vote: poets not picked by any coach appear
+                        in one random list and the public votes on who stays. Flag Danger Zone poets from the Teams tab first.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="inline-flex rounded-lg border border-border/40 p-1">
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant={mode === "teams" ? "default" : "ghost"}
+                            onClick={() => handleSetMode("teams")}
+                            disabled={isSavingMode}
+                            className={mode === "teams" ? "bg-gradient-to-r from-primary to-accent" : ""}
+                        >
+                            <Users className="w-4 h-4 mr-2" />
+                            Team Voting
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant={mode === "danger" ? "default" : "ghost"}
+                            onClick={() => handleSetMode("danger")}
+                            disabled={isSavingMode}
+                            className={mode === "danger" ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+                        >
+                            {isSavingMode ? <Spinner size="sm" className="mr-2" /> : <Flame className="w-4 h-4 mr-2" />}
+                            Danger Zone
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card className="bg-white border-border/40 backdrop-blur shadow-sm">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
                         <Tag className="w-5 h-5 text-primary" />
                         <CardTitle>Team Label</CardTitle>
                     </div>
@@ -144,7 +218,7 @@ export default function AdminSettings() {
                         <CardTitle>Voting Round</CardTitle>
                     </div>
                     <CardDescription>
-                        Current round is <strong>{round}</strong>. Voters pick one contestant from each open team.
+                        Current round is <strong>{round}</strong>. Each voting code casts a single vote.
                         Starting a new round closes all teams and lets every voter buy a fresh ticket.
                     </CardDescription>
                 </CardHeader>
