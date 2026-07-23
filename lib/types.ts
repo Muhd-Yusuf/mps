@@ -11,6 +11,7 @@ export interface Participant {
   name: string
   votes: number
   image?: string
+  inDanger?: boolean
   createdAt?: string
   updatedAt?: string
 }

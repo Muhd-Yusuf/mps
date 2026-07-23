@@ -26,6 +26,7 @@ function serializeParticipant(participant: any, teamId: string) {
     name: participant.name,
     image: participant.image,
     votes: participant.votes ?? 0,
+    inDanger: participant.inDanger ?? false,
     teamId,
     createdAt: participant.createdAt?.toISOString?.() ?? participant.createdAt,
     updatedAt: participant.updatedAt?.toISOString?.() ?? participant.updatedAt,

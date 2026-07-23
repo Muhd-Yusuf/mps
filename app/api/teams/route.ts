@@ -46,6 +46,7 @@ function serializeTeam(team: any) {
       name: participant.name,
       image: participant.image,
       votes: participant.votes ?? 0,
+      inDanger: participant.inDanger ?? false,
       teamId: team._id.toString(),
       createdAt: participant.createdAt?.toISOString?.() ?? participant.createdAt,
       updatedAt: participant.updatedAt?.toISOString?.() ?? participant.updatedAt,

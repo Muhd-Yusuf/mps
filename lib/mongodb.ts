@@ -47,6 +47,9 @@ const participantSchema = new Schema(
     name: { type: String, required: true, trim: true },
     votes: { type: Number, default: 0 },
     image: { type: String, trim: true },
+    // Blind audition: poets not chosen by any coach land in the Danger Zone,
+    // where the public votes on who stays in the competition.
+    inDanger: { type: Boolean, default: false },
   },
   { timestamps: true }
 )

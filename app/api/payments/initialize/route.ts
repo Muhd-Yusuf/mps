@@ -74,13 +74,27 @@ export async function POST(request: Request) {
 
     await connectToDatabase()
 
-    // A ticket can only be useful if there is at least one team open to vote for.
-    const openTeamCount = await TeamModel.countDocuments({ votingOpen: true })
-    if (openTeamCount === 0) {
-      return NextResponse.json(
-        { error: "Voting is not open right now. Please wait for the next round." },
-        { status: 409 }
-      )
+    // A ticket can only be useful if there is something to vote on: an open team
+    // in regular mode, or at least one Danger Zone poet during blind auditions.
+    const modeSetting = await SettingModel.findOne({ key: "voting_mode" }).lean()
+    const votingMode = modeSetting?.value === "danger" ? "danger" : "teams"
+
+    if (votingMode === "danger") {
+      const dangerCount = await TeamModel.countDocuments({ "participants.inDanger": true })
+      if (dangerCount === 0) {
+        return NextResponse.json(
+          { error: "Voting is not open right now. Please wait for the next stage." },
+          { status: 409 }
+        )
+      }
+    } else {
+      const openTeamCount = await TeamModel.countDocuments({ votingOpen: true })
+      if (openTeamCount === 0) {
+        return NextResponse.json(
+          { error: "Voting is not open right now. Please wait for the next round." },
+          { status: 409 }
+        )
+      }
     }
 
     // Tickets belong to the current round. Admin advances the round to reset limits.
