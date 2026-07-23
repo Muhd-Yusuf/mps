@@ -10,7 +10,7 @@ export default function VoteConfirmation() {
       {/* Navigation */}
       <nav className="border-b border-slate-700 bg-slate-900/50 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-2xl font-bold text-white">MPS Poetry Challenge</h1>
+          <h1 className="text-2xl font-bold text-white">MPS Media Poetry Challenge</h1>
         </div>
       </nav>
 
@@ -20,7 +20,7 @@ export default function VoteConfirmation() {
             <div className="text-6xl mb-4">✓</div>
             <CardTitle className="text-3xl text-white">Votes Recorded!</CardTitle>
             <CardDescription className="text-lg">
-              Thank you for participating in the MPS Poetry Challenge
+              Thank you for participating in the MPS Media Poetry Challenge
             </CardDescription>
           </CardHeader>
 

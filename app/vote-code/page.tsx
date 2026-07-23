@@ -48,7 +48,7 @@ export default function VoteCodePage() {
           <Link href="/" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
             <ArrowLeft className="w-5 h-5" />
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              MPS Poetry Challenge
+              MPS Media Poetry Challenge
             </h1>
           </Link>
         </div>

@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     apple: "/apple-icon.png",
   },
   openGraph: {
-    title: "MPS Poetry Challenge - Voting Platform",
+    title: "MPS Media Poetry Challenge - Voting Platform",
     description: "Professional voting platform for MPS Media Poetry Challenge",
   },
 }

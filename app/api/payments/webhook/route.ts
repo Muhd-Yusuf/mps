@@ -71,7 +71,7 @@ export async function POST(request: Request) {
                     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
                     await sendEmail({
                         to: ticket.email,
-                        subject: "Your MPS Poetry Challenge Voting Code",
+                        subject: "Your MPS Media Poetry Challenge Voting Code",
                         htmlContent: createVotingCodeEmailTemplate(ticket.votingCode, appUrl),
                         textContent: createVotingCodeEmailText(ticket.votingCode, appUrl),
                     })
