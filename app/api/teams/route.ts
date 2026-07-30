@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { getServerSession } from "next-auth"
 
 import { connectToDatabase, TeamModel } from "@/lib/mongodb"
+import { authOptions } from "@/lib/auth"
 
 const coachSchema = z.object({
   name: z.string().min(1, "Coach name is required"),
@@ -33,7 +35,9 @@ function normalizeString(value?: string | null) {
   return trimmed.length ? trimmed : undefined
 }
 
-function serializeTeam(team: any) {
+// Vote counts are admin-only: the audience must never see results or
+// leaderboards, so public responses always report votes as 0.
+function serializeTeam(team: any, includeVotes = true) {
   return {
     id: team._id.toString(),
     name: team.name,
@@ -45,7 +49,7 @@ function serializeTeam(team: any) {
       id: participant._id.toString(),
       name: participant.name,
       image: participant.image,
-      votes: participant.votes ?? 0,
+      votes: includeVotes ? participant.votes ?? 0 : 0,
       inDanger: participant.inDanger ?? false,
       teamId: team._id.toString(),
       createdAt: participant.createdAt?.toISOString?.() ?? participant.createdAt,
@@ -58,10 +62,11 @@ function serializeTeam(team: any) {
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions)
     await connectToDatabase()
     const teams = await TeamModel.find().sort({ order: 1, createdAt: 1 }).lean()
 
-    return NextResponse.json({ teams: teams.map(serializeTeam) })
+    return NextResponse.json({ teams: teams.map((team) => serializeTeam(team, Boolean(session))) })
   } catch (error) {
     console.error("[GET_TEAMS_ERROR]", error)
     return NextResponse.json({ error: "Failed to fetch teams" }, { status: 500 })
