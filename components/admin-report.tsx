@@ -5,6 +5,7 @@ import { FileText, FileSpreadsheet } from "lucide-react"
 import { toast } from "sonner"
 
 import type { Team, Ticket } from "@/lib/types"
+import { getPreset, type StagePreset } from "@/lib/stages"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
@@ -15,6 +16,9 @@ type ReportData = {
   teams: Team[]
   tickets: Ticket[]
   label: string
+  preset: StagePreset
+  round: number
+  roundLabel: string
   generatedAt: Date
 }
 
@@ -26,10 +30,12 @@ const currency = new Intl.NumberFormat("en-NG", {
 })
 
 async function loadReportData(): Promise<ReportData> {
-  const [teamsRes, paymentsRes, labelRes] = await Promise.all([
+  const [teamsRes, paymentsRes, labelRes, presetRes, roundRes] = await Promise.all([
     fetch("/api/teams", { cache: "no-store" }),
     fetch("/api/payments", { cache: "no-store" }),
     fetch("/api/settings/label", { cache: "no-store" }),
+    fetch("/api/settings/preset", { cache: "no-store" }),
+    fetch("/api/settings/round", { cache: "no-store" }),
   ])
 
   if (!teamsRes.ok) throw new Error("Failed to load teams")
@@ -47,29 +53,88 @@ async function loadReportData(): Promise<ReportData> {
     label = (await labelRes.json())?.label || "Team"
   }
 
-  return { teams, tickets, label, generatedAt: new Date() }
+  let preset = getPreset(null)
+  if (presetRes.ok) {
+    preset = getPreset((await presetRes.json())?.preset)
+  }
+
+  let round = 1
+  let roundLabel = ""
+  if (roundRes.ok) {
+    const roundData = await roundRes.json()
+    round = roundData?.round ?? 1
+    roundLabel = roundData?.label ?? ""
+  }
+
+  return { teams, tickets, label, preset, round, roundLabel, generatedAt: new Date() }
 }
 
-function summarize({ teams, tickets }: ReportData) {
-  const participants = teams.flatMap((team) =>
-    (team.participants ?? []).map((p) => ({
-      team: team.name,
-      name: p.name,
-      votes: p.votes ?? 0,
-    }))
+type RankedRow = {
+  rank: number
+  team: string
+  name: string
+  votes: number
+  status: string
+}
+
+// Rank poets the way the current stage counts them: danger stages rank only the
+// flagged poets; "perTeam" slices rank within each team; the top N get the
+// stage's advance label (REVIVED / ADVANCES / SAVED).
+function rankForStage(teams: Team[], preset: StagePreset): RankedRow[] {
+  const { slice, advance, advanceLabel } = preset.results
+  const isDanger = preset.mode === "danger"
+
+  const pool = teams.flatMap((team) =>
+    (team.participants ?? [])
+      .filter((p) => (isDanger ? p.inDanger : true))
+      .map((p) => ({ team: team.name, name: p.name, votes: p.votes ?? 0 }))
   )
-  const totalVotes = participants.reduce((sum, p) => sum + p.votes, 0)
+
+  if (slice === "perTeam" && advance > 0) {
+    const rows: RankedRow[] = []
+    const teamNames = [...new Set(pool.map((p) => p.team))]
+    teamNames.forEach((teamName) => {
+      pool
+        .filter((p) => p.team === teamName)
+        .sort((a, b) => b.votes - a.votes)
+        .forEach((p, index) => {
+          rows.push({
+            rank: index + 1,
+            team: p.team,
+            name: p.name,
+            votes: p.votes,
+            status: index < advance && p.votes > 0 ? advanceLabel : "",
+          })
+        })
+    })
+    return rows
+  }
+
+  return pool
+    .sort((a, b) => b.votes - a.votes)
+    .map((p, index) => ({
+      rank: index + 1,
+      team: p.team,
+      name: p.name,
+      votes: p.votes,
+      status: advance > 0 && index < advance && p.votes > 0 ? advanceLabel : "",
+    }))
+}
+
+function summarize({ teams, tickets, preset }: ReportData) {
+  const ranked = rankForStage(teams, preset)
+  const totalVotes = ranked.reduce((sum, p) => sum + p.votes, 0)
   const revenue = tickets.reduce((sum, t) => sum + (t.amount ?? 0), 0)
   const votedTickets = tickets.filter((t) => t.hasVoted).length
 
   return {
     totalTeams: teams.length,
-    totalParticipants: participants.length,
+    totalParticipants: ranked.length,
     totalVotes,
     ticketsSold: tickets.length,
     votedTickets,
     revenue,
-    participants,
+    ranked,
   }
 }
 
@@ -99,6 +164,8 @@ function buildCsv(data: ReportData, scope: ReportScope) {
   const lines: string[] = []
 
   lines.push(`MPS Media Poetry Challenge - ${includeRevenue ? "Full Statement" : "Results"}`)
+  lines.push(`Stage,${escapeCsv(data.preset.name)}`)
+  lines.push(`Round,${escapeCsv(data.roundLabel ? `${data.round} — ${data.roundLabel}` : String(data.round))}`)
   lines.push(`Generated,${escapeCsv(data.generatedAt.toLocaleString())}`)
   lines.push("")
   lines.push("Summary")
@@ -111,16 +178,14 @@ function buildCsv(data: ReportData, scope: ReportScope) {
     lines.push(`Total Revenue,${escapeCsv(currency.format(s.revenue))}`)
   }
   lines.push("")
-  lines.push(`Rank,${escapeCsv(data.label)},Contestant,Votes`)
+  const hasStatus = data.preset.results.advance > 0
+  lines.push(`Rank,${escapeCsv(data.label)},Contestant,Votes${hasStatus ? ",Status" : ""}`)
 
-  s.participants
-    .slice()
-    .sort((a, b) => b.votes - a.votes)
-    .forEach((p, index) => {
-      lines.push(
-        [index + 1, escapeCsv(p.team), escapeCsv(p.name), p.votes].join(",")
-      )
-    })
+  s.ranked.forEach((p) => {
+    const row = [p.rank, escapeCsv(p.team), escapeCsv(p.name), p.votes]
+    if (hasStatus) row.push(escapeCsv(p.status))
+    lines.push(row.join(","))
+  })
 
   // BOM so Excel reads UTF-8 correctly.
   return new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" })
@@ -188,6 +253,8 @@ async function buildPdf(data: ReportData, scope: ReportScope) {
     startY: 36,
     head: [["Summary", ""]],
     body: [
+      ["Stage", data.preset.name],
+      ["Round", data.roundLabel ? `${data.round} — ${data.roundLabel}` : String(data.round)],
       ["Teams", String(s.totalTeams)],
       ["Poets", String(s.totalParticipants)],
       ["Total Votes", String(s.totalVotes)],
@@ -203,18 +270,30 @@ async function buildPdf(data: ReportData, scope: ReportScope) {
     headStyles: { fillColor: BRAND_INDIGO },
   })
 
-  const ranked = s.participants
-    .slice()
-    .sort((a, b) => b.votes - a.votes)
-    .map((p, index) => [String(index + 1), p.team, p.name, String(p.votes)])
+  const hasStatus = data.preset.results.advance > 0
+  const ranked = s.ranked.map((p) => [
+    String(p.rank),
+    p.team,
+    p.name,
+    String(p.votes),
+    ...(hasStatus ? [p.status] : []),
+  ])
 
   autoTable(doc, {
     ...pageOpts,
     startY: (doc as any).lastAutoTable.finalY + 8,
-    head: [["Rank", data.label, "Contestant", "Votes"]],
+    head: [["Rank", data.label, "Contestant", "Votes", ...(hasStatus ? ["Status"] : [])]],
     body: ranked,
     theme: "striped",
     headStyles: { fillColor: BRAND_PURPLE },
+    // Bold the qualifying rows so the cut-off is obvious at a glance.
+    didParseCell: hasStatus
+      ? (hook: any) => {
+          if (hook.section === "body" && hook.row.raw?.[4]) {
+            hook.cell.styles.fontStyle = "bold"
+          }
+        }
+      : undefined,
   })
 
   doc.save(`mps-report-${fileStamp(data.generatedAt)}.pdf`)

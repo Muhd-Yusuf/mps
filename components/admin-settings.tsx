@@ -6,18 +6,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
-import { Save, RotateCw, Tag, Flame, Users } from "lucide-react"
+import { Save, RotateCw, Tag, Flame, CheckCircle2 } from "lucide-react"
 
-type VotingMode = "teams" | "danger"
+import { STAGE_PRESETS, getPreset } from "@/lib/stages"
+
+function advancementText(presetKey: string): string {
+    const preset = getPreset(presetKey)
+    const { slice, advance, advanceLabel } = preset.results
+    if (!advance) return "Results are a full ranking — no automatic cut-off."
+    if (slice === "perTeam") {
+        return `Top ${advance} per team ${advanceLabel === "SAVED" ? "is saved" : "advance"} by audience vote.`
+    }
+    return `Top ${advance} overall ${advanceLabel === "REVIVED" ? "are revived" : "advance"} by audience vote.`
+}
 
 export default function AdminSettings() {
     const [teamLabel, setTeamLabel] = useState<string>("Team")
     const [round, setRound] = useState<number>(1)
-    const [mode, setMode] = useState<VotingMode>("teams")
+    const [roundLabel, setRoundLabel] = useState<string>("")
+    const [presetKey, setPresetKey] = useState<string>("team_voting")
     const [isLoading, setIsLoading] = useState(true)
     const [isSavingLabel, setIsSavingLabel] = useState(false)
+    const [isSavingRoundLabel, setIsSavingRoundLabel] = useState(false)
     const [isAdvancing, setIsAdvancing] = useState(false)
-    const [isSavingMode, setIsSavingMode] = useState(false)
+    const [isSavingPreset, setIsSavingPreset] = useState(false)
 
     useEffect(() => {
         fetchSettings()
@@ -26,14 +38,18 @@ export default function AdminSettings() {
     const fetchSettings = async () => {
         try {
             setIsLoading(true)
-            const [labelRes, roundRes, modeRes] = await Promise.all([
+            const [labelRes, roundRes, presetRes] = await Promise.all([
                 fetch("/api/settings/label"),
                 fetch("/api/settings/round"),
-                fetch("/api/settings/mode"),
+                fetch("/api/settings/preset"),
             ])
             if (labelRes.ok) setTeamLabel((await labelRes.json()).label)
-            if (roundRes.ok) setRound((await roundRes.json()).round)
-            if (modeRes.ok) setMode((await modeRes.json()).mode === "danger" ? "danger" : "teams")
+            if (roundRes.ok) {
+                const roundData = await roundRes.json()
+                setRound(roundData.round)
+                setRoundLabel(roundData.label ?? "")
+            }
+            if (presetRes.ok) setPresetKey(getPreset((await presetRes.json()).preset).key)
         } catch (error) {
             toast.error("Error loading settings")
             console.error(error)
@@ -42,31 +58,32 @@ export default function AdminSettings() {
         }
     }
 
-    const handleSetMode = async (nextMode: VotingMode) => {
-        if (nextMode === mode) return
+    const handleSetPreset = async (nextKey: string) => {
+        if (nextKey === presetKey) return
+        const next = getPreset(nextKey)
         const message =
-            nextMode === "danger"
-                ? "Switch to the Danger Zone stage? Voters will see the poets you flagged as Danger Zone in one random list — team voting stops."
-                : "Switch back to Team Voting? The Danger Zone list is hidden and open teams become votable again."
+            `Switch the live site to "${next.name}"?\n\n` +
+            `Voters will see: "${next.heading}" — ${next.description}\n\n` +
+            `Before switching: ${next.adminPrep}`
         if (!confirm(message)) return
         try {
-            setIsSavingMode(true)
-            const response = await fetch("/api/settings/mode", {
+            setIsSavingPreset(true)
+            const response = await fetch("/api/settings/preset", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mode: nextMode }),
+                body: JSON.stringify({ preset: next.key }),
             })
             if (!response.ok) {
                 const data = await response.json()
                 throw new Error(data.error || "Failed to switch stage")
             }
             const data = await response.json()
-            setMode(data.mode)
-            toast.success(data.mode === "danger" ? "Danger Zone stage is now live" : "Team Voting stage is now live")
+            setPresetKey(getPreset(data.preset).key)
+            toast.success(`"${next.name}" is now live`)
         } catch (error: any) {
             toast.error(error.message || "Error switching stage")
         } finally {
-            setIsSavingMode(false)
+            setIsSavingPreset(false)
         }
     }
 
@@ -92,8 +109,30 @@ export default function AdminSettings() {
         }
     }
 
+    const handleSaveRoundLabel = async () => {
+        try {
+            setIsSavingRoundLabel(true)
+            const response = await fetch("/api/settings/round", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "label", label: roundLabel.trim() }),
+            })
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || "Failed to save round name")
+            }
+            const data = await response.json()
+            setRoundLabel(data.label ?? "")
+            toast.success("Round name saved")
+        } catch (error: any) {
+            toast.error(error.message || "Error saving round name")
+        } finally {
+            setIsSavingRoundLabel(false)
+        }
+    }
+
     const handleAdvanceRound = async () => {
-        if (!confirm("Start a new round? This closes voting on all teams and lets everyone buy a new ticket.")) {
+        if (!confirm("Start a new round? This closes voting on all teams, clears the round name, and lets everyone buy a new ticket.")) {
             return
         }
         try {
@@ -109,6 +148,7 @@ export default function AdminSettings() {
             }
             const data = await response.json()
             setRound(data.round)
+            setRoundLabel(data.label ?? "")
             toast.success(`Round ${data.round} started. All teams closed — open the ones for this round.`)
         } catch (error: any) {
             toast.error(error.message || "Error starting new round")
@@ -134,36 +174,107 @@ export default function AdminSettings() {
                         <CardTitle>Competition Stage</CardTitle>
                     </div>
                     <CardDescription>
-                        Each stage is unique. <strong>Team Voting</strong> shows poets grouped under their open teams.{" "}
-                        <strong>Danger Zone</strong> is the blind-audition save vote: poets not picked by any coach appear
-                        in one random list and the public votes on who stays. Flag Danger Zone poets from the Teams tab first.
+                        Pick the stage the competition is in right now. Each stage sets what voters see, which
+                        poets are votable, and how results are counted in reports.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="inline-flex rounded-lg border border-border/40 p-1">
+                    <div className="grid gap-3">
+                        {STAGE_PRESETS.map((stage) => {
+                            const isActive = stage.key === presetKey
+                            return (
+                                <button
+                                    key={stage.key}
+                                    type="button"
+                                    onClick={() => handleSetPreset(stage.key)}
+                                    disabled={isSavingPreset}
+                                    className={`text-left rounded-xl border-2 p-4 transition-all ${
+                                        isActive ? "shadow-md" : "border-border/40 hover:border-border bg-white"
+                                    }`}
+                                    style={
+                                        isActive
+                                            ? {
+                                                  borderColor: stage.accentColor,
+                                                  background: `linear-gradient(135deg, ${stage.accentColor}14, ${stage.accentColor}05)`,
+                                              }
+                                            : undefined
+                                    }
+                                >
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="font-semibold text-foreground">{stage.name}</p>
+                                        {isActive && (
+                                            <span
+                                                className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full text-white whitespace-nowrap"
+                                                style={{ backgroundColor: stage.accentColor }}
+                                            >
+                                                <CheckCircle2 className="w-3 h-3" /> LIVE
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">{advancementText(stage.key)}</p>
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        <strong>Prep:</strong> {stage.adminPrep}
+                                    </p>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card className="bg-white border-border/40 backdrop-blur shadow-sm">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <RotateCw className="w-5 h-5 text-primary" />
+                        <CardTitle>Voting Round</CardTitle>
+                    </div>
+                    <CardDescription>
+                        Current round is <strong>{round}</strong>
+                        {roundLabel ? <> — <strong>{roundLabel}</strong></> : null}. Each voting code casts a single
+                        vote. Starting a new round closes all teams and lets every voter buy a fresh ticket.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex flex-wrap gap-3 items-center">
+                        <Input
+                            value={roundLabel}
+                            onChange={(e) => setRoundLabel(e.target.value)}
+                            placeholder="e.g. Bauchi — Blind Audition Revival"
+                            maxLength={80}
+                            className="max-w-[320px]"
+                        />
                         <Button
-                            type="button"
-                            size="sm"
-                            variant={mode === "teams" ? "default" : "ghost"}
-                            onClick={() => handleSetMode("teams")}
-                            disabled={isSavingMode}
-                            className={mode === "teams" ? "bg-gradient-to-r from-primary to-accent" : ""}
+                            onClick={handleSaveRoundLabel}
+                            disabled={isSavingRoundLabel}
+                            variant="outline"
+                            className="border-border/40 hover:bg-muted"
                         >
-                            <Users className="w-4 h-4 mr-2" />
-                            Team Voting
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant={mode === "danger" ? "default" : "ghost"}
-                            onClick={() => handleSetMode("danger")}
-                            disabled={isSavingMode}
-                            className={mode === "danger" ? "bg-red-600 hover:bg-red-700 text-white" : ""}
-                        >
-                            {isSavingMode ? <Spinner size="sm" className="mr-2" /> : <Flame className="w-4 h-4 mr-2" />}
-                            Danger Zone
+                            {isSavingRoundLabel ? <Spinner size="sm" className="mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                            Save Round Name
                         </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                        Name each round after its event so reports stay clear months later
+                        (e.g. &ldquo;Kaduna — Knockout Audience Vote&rdquo;).
+                    </p>
+                    <Button
+                        onClick={handleAdvanceRound}
+                        disabled={isAdvancing}
+                        variant="outline"
+                        className="border-border/40 hover:bg-muted"
+                    >
+                        {isAdvancing ? (
+                            <>
+                                <Spinner size="sm" className="mr-2" />
+                                Starting...
+                            </>
+                        ) : (
+                            <>
+                                <RotateCw className="w-4 h-4 mr-2" />
+                                Start New Round
+                            </>
+                        )}
+                    </Button>
                 </CardContent>
             </Card>
 
@@ -205,39 +316,6 @@ export default function AdminSettings() {
                             <>
                                 <Save className="w-4 h-4 mr-2" />
                                 Save Label
-                            </>
-                        )}
-                    </Button>
-                </CardContent>
-            </Card>
-
-            <Card className="bg-white border-border/40 backdrop-blur shadow-sm">
-                <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <RotateCw className="w-5 h-5 text-primary" />
-                        <CardTitle>Voting Round</CardTitle>
-                    </div>
-                    <CardDescription>
-                        Current round is <strong>{round}</strong>. Each voting code casts a single vote.
-                        Starting a new round closes all teams and lets every voter buy a fresh ticket.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button
-                        onClick={handleAdvanceRound}
-                        disabled={isAdvancing}
-                        variant="outline"
-                        className="border-border/40 hover:bg-muted"
-                    >
-                        {isAdvancing ? (
-                            <>
-                                <Spinner size="sm" className="mr-2" />
-                                Starting...
-                            </>
-                        ) : (
-                            <>
-                                <RotateCw className="w-4 h-4 mr-2" />
-                                Start New Round
                             </>
                         )}
                     </Button>
