@@ -31,6 +31,9 @@ export type ResultRule = {
 export type StagePreset = {
   key: string
   name: string
+  // What the public homepage banner shows while this stage is live.
+  // Empty string = fall back to the admin's custom banner text.
+  publicLabel: string
   mode: VotingMode
   // Danger-list layout: flat shuffled list vs grouped under team headers.
   dangerLayout?: "flat" | "grouped"
@@ -48,6 +51,7 @@ export const BRAND_COLOR = "#667EEA"
 export const STAGE_PRESETS: StagePreset[] = [
   {
     key: "team_voting",
+    publicLabel: "",
     name: "Team Voting (General)",
     mode: "teams",
     accentColor: BRAND_COLOR,
@@ -58,6 +62,7 @@ export const STAGE_PRESETS: StagePreset[] = [
   },
   {
     key: "blind_audition",
+    publicLabel: "Blind Audition — Danger Zone",
     name: "Blind Audition — Danger Zone",
     mode: "danger",
     dangerLayout: "flat",
@@ -70,6 +75,7 @@ export const STAGE_PRESETS: StagePreset[] = [
   },
   {
     key: "battle_round",
+    publicLabel: "Battle Round — Revival Vote",
     name: "Battle Round — Revival",
     mode: "danger",
     dangerLayout: "flat",
@@ -82,6 +88,7 @@ export const STAGE_PRESETS: StagePreset[] = [
   },
   {
     key: "knockout",
+    publicLabel: "Knockout Stage — Audience Vote",
     name: "Knockout Stage — Audience Vote",
     mode: "danger",
     dangerLayout: "flat",
@@ -94,6 +101,7 @@ export const STAGE_PRESETS: StagePreset[] = [
   },
   {
     key: "quarter_final",
+    publicLabel: "Quarter Final — Abuja",
     name: "Quarter Final (Abuja)",
     mode: "teams",
     accentColor: BRAND_COLOR,
@@ -105,6 +113,7 @@ export const STAGE_PRESETS: StagePreset[] = [
   },
   {
     key: "semi_final",
+    publicLabel: "Semi Final — Danger Zone",
     name: "Semi Final — Danger Zone",
     mode: "danger",
     dangerLayout: "grouped",

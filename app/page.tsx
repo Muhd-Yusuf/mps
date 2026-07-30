@@ -5,6 +5,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowRight, Menu, X, Mic, Swords, Flame, Trophy, Users, MapPin, Ticket, Vote, Megaphone, ClipboardCheck, Star } from "lucide-react"
+
+import { getPreset } from "@/lib/stages"
 // import { PartnersCarousel } from "@/components/partners-carousel"
 
 // The competition journey, straight from the Official Contestants' Manual.
@@ -72,13 +74,23 @@ export default function Home() {
       const minLoaderTime = new Promise((resolve) => setTimeout(resolve, 2000))
       const fetchPromise = (async () => {
         try {
-          const response = await fetch("/api/settings/stage")
-          if (response.ok) {
-            const data = await response.json()
+          // The banner always reflects the LIVE competition stage. The manual
+          // banner text is only a fallback for the general Team Voting preset.
+          const [presetRes, stageRes] = await Promise.all([
+            fetch("/api/settings/preset"),
+            fetch("/api/settings/stage"),
+          ])
+          let label = ""
+          if (presetRes.ok) {
+            label = getPreset((await presetRes.json()).preset).publicLabel
+          }
+          if (!label && stageRes.ok) {
+            const data = await stageRes.json()
             if (data.stage && data.stage !== "Not Set") {
-              setStage(data.stage)
+              label = data.stage
             }
           }
+          if (label) setStage(label)
         } catch (error) {
           console.error("Failed to fetch stage:", error)
         }

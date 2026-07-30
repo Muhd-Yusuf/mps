@@ -68,8 +68,11 @@ export default function AdminStageManager() {
   return (
     <Card className="mb-6 bg-white border-border/40 backdrop-blur">
       <CardHeader>
-        <CardTitle>Competition Stage</CardTitle>
-        <CardDescription>Set the current stage of the poetry challenge (e.g., Quarter-Final, Semi-Final, Final).</CardDescription>
+        <CardTitle>Homepage Banner Text</CardTitle>
+        <CardDescription>
+          Custom text for the homepage badge. Only shown when the Competition Stage (Settings tab) is set to
+          Team Voting (General) — every other stage shows its own name automatically.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
