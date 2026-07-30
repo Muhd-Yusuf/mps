@@ -12,11 +12,9 @@ import Link from "next/link"
 import Image from "next/image"
 import { toast } from "sonner"
 
-type VotingMode = "teams" | "danger"
+import { getPreset, type StagePreset } from "@/lib/stages"
 
-const DANGER_COLOR = "#DC2626"
-
-// Danger Zone poets are shown in a random order with no team grouping.
+// Danger-list poets are shown in a random order.
 function shuffle<T>(items: T[]): T[] {
   const next = [...items]
   for (let i = next.length - 1; i > 0; i--) {
@@ -40,16 +38,20 @@ export default function VotePage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isSubmittingVotes, setIsSubmittingVotes] = useState(false)
   const [teamLabel, setTeamLabel] = useState("Team")
-  const [mode, setMode] = useState<VotingMode>("teams")
+  const [preset, setPreset] = useState<StagePreset>(getPreset(null))
+  // Semi Final groups the danger list under team headers; other danger stages are flat.
+  const [dangerGroups, setDangerGroups] = useState<{ id: string; name: string; poets: Participant[] }[]>([])
+
+  const mode = preset.mode
 
   const fetchTeams = useCallback(async () => {
     try {
       setIsLoading(true)
       setLoadError(null)
-      const [teamsResponse, labelResponse, modeResponse] = await Promise.all([
+      const [teamsResponse, labelResponse, presetResponse] = await Promise.all([
         fetch("/api/teams", { cache: "no-store" }),
         fetch("/api/settings/label", { cache: "no-store" }),
-        fetch("/api/settings/mode", { cache: "no-store" }),
+        fetch("/api/settings/preset", { cache: "no-store" }),
       ])
 
       if (!teamsResponse.ok) {
@@ -61,28 +63,30 @@ export default function VotePage() {
         setTeamLabel(labelData.label || "Team")
       }
 
-      let currentMode: VotingMode = "teams"
-      if (modeResponse.ok) {
-        const modeData = await modeResponse.json()
-        currentMode = modeData.mode === "danger" ? "danger" : "teams"
+      let currentPreset = getPreset(null)
+      if (presetResponse.ok) {
+        const presetData = await presetResponse.json()
+        currentPreset = getPreset(presetData.preset)
       }
-      setMode(currentMode)
+      setPreset(currentPreset)
 
       const data = await teamsResponse.json()
       const allTeams: Team[] = data?.teams ?? []
 
-      if (currentMode === "danger") {
-        // Blind audition: poets not chosen by any coach, no team grouping, random order.
+      if (currentPreset.mode === "danger") {
+        // Danger-list stage: only flagged poets are votable, in random order.
         setTeams([])
         const dangerPoets: Participant[] = []
+        const groups: { id: string; name: string; poets: Participant[] }[] = []
         allTeams.forEach((team) => {
-          team.participants?.forEach((participant) => {
-            if (participant.inDanger) {
-              dangerPoets.push({ ...participant, teamId: team.id })
-            }
-          })
+          const flagged = (team.participants ?? []).filter((p) => p.inDanger)
+          if (!flagged.length) return
+          const poets = shuffle(flagged.map((p) => ({ ...p, teamId: team.id })))
+          dangerPoets.push(...poets)
+          groups.push({ id: team.id, name: team.name, poets })
         })
-        setParticipants(shuffle(dangerPoets))
+        setParticipants(currentPreset.dangerLayout === "grouped" ? dangerPoets : shuffle(dangerPoets))
+        setDangerGroups(groups)
       } else {
         // Regular stage: only teams the admin has opened are votable.
         const openTeams = allTeams.filter((team) => team.votingOpen)
@@ -377,57 +381,81 @@ export default function VotePage() {
             <div className="lg:col-span-2">
               {mode === "danger" ? (
                 <>
-                  {/* Danger Zone: blind-audition save vote — no team grouping, random order */}
+                  {/* Danger-list stage: heading, copy and accent come from the stage preset */}
                   <div className="mb-6 sm:mb-8 animate-fade-in-up">
                     <Card
                       className="relative overflow-hidden border-2 mb-6 p-4 sm:p-6 shadow-lg rounded-2xl"
                       style={{
-                        borderColor: DANGER_COLOR,
-                        background: `linear-gradient(135deg, ${DANGER_COLOR}26, ${DANGER_COLOR}0a)`,
+                        borderColor: preset.accentColor,
+                        background: `linear-gradient(135deg, ${preset.accentColor}26, ${preset.accentColor}0a)`,
                       }}
                     >
-                      <div className="absolute left-0 top-0 bottom-0 w-2" style={{ backgroundColor: DANGER_COLOR }} />
+                      <div className="absolute left-0 top-0 bottom-0 w-2" style={{ backgroundColor: preset.accentColor }} />
                       <div className="flex items-center gap-3 pl-2">
                         <div
                           className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-md"
-                          style={{ backgroundColor: `${DANGER_COLOR}1a` }}
+                          style={{ backgroundColor: `${preset.accentColor}1a` }}
                         >
-                          <Flame className="w-6 h-6" style={{ color: DANGER_COLOR }} />
+                          <Flame className="w-6 h-6" style={{ color: preset.accentColor }} />
                         </div>
                         <div>
                           <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-                            Danger Zone
+                            {preset.heading}
                           </h2>
-                          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-                            Choose who you want to keep in the competition. These poets were not picked by any
-                            coach — your vote decides who stays.
-                          </p>
+                          <p className="text-sm sm:text-base text-muted-foreground mt-1">{preset.description}</p>
                         </div>
                       </div>
                     </Card>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                    {participants.map((participant) => (
-                      <VotingCard
-                        key={participant.id}
-                        participant={participant}
-                        isSelected={selections.some((s) => s.participantId === participant.id)}
-                        onSelect={() => handleVoteSelect(participant.teamId ?? "", participant.id)}
-                        teamColor={DANGER_COLOR}
-                      />
-                    ))}
-                  </div>
+                  {preset.dangerLayout === "grouped" ? (
+                    <div className="space-y-8 sm:space-y-10">
+                      {dangerGroups.map((group) => (
+                        <div key={group.id}>
+                          <div className="flex items-center gap-2 mb-3">
+                            <span
+                              className="inline-block w-3 h-3 rounded-full shadow"
+                              style={{ backgroundColor: preset.accentColor }}
+                            />
+                            <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-foreground">
+                              {group.name}
+                            </h3>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                            {group.poets.map((participant) => (
+                              <VotingCard
+                                key={participant.id}
+                                participant={participant}
+                                isSelected={selections.some((s) => s.participantId === participant.id)}
+                                onSelect={() => handleVoteSelect(group.id, participant.id)}
+                                teamColor={preset.accentColor}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                      {participants.map((participant) => (
+                        <VotingCard
+                          key={participant.id}
+                          participant={participant}
+                          isSelected={selections.some((s) => s.participantId === participant.id)}
+                          onSelect={() => handleVoteSelect(participant.teamId ?? "", participant.id)}
+                          teamColor={preset.accentColor}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
                   <div className="mb-6 sm:mb-8 animate-fade-in-up">
                     <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2 sm:mb-3">
-                      Cast Your Vote
+                      {preset.heading}
                     </h2>
-                    <p className="text-sm sm:text-base text-muted-foreground">
-                      Choose the one poet you want to support. Each voting code gives you a single vote.
-                    </p>
+                    <p className="text-sm sm:text-base text-muted-foreground">{preset.description}</p>
                   </div>
 
                   <div className="space-y-8 sm:space-y-10">
@@ -523,8 +551,8 @@ export default function VotePage() {
                           style={{
                             backgroundColor:
                               mode === "danger"
-                                ? DANGER_COLOR
-                                : teams.find((t) => t.id === selections[0]?.teamId)?.color ?? DANGER_COLOR,
+                                ? preset.accentColor
+                                : teams.find((t) => t.id === selections[0]?.teamId)?.color ?? preset.accentColor,
                           }}
                         />
                         <span className="font-medium text-foreground">{selectedParticipant.name}</span>
