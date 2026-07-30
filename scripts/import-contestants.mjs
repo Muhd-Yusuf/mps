@@ -75,8 +75,10 @@ async function downloadDriveFile(fileId) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const res = await fetch(url, { redirect: "follow" })
     const type = res.headers.get("content-type") ?? ""
-    if (type.startsWith("image/")) {
-      const ext = type.includes("png") ? "png" : type.includes("webp") ? "webp" : "jpg"
+    // Anything that isn't an HTML page is the file itself (some uploads are
+    // HEIC/octet-stream — Cloudinary converts them on upload).
+    if (!type.includes("text/html")) {
+      const ext = type.includes("png") ? "png" : type.includes("webp") ? "webp" : type.includes("hei") ? "heic" : "jpg"
       const file = path.join(CACHE_DIR, `${fileId}.${ext}`)
       fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()))
       return file
@@ -166,6 +168,7 @@ for (const c of contestants) {
         folder: "mps/contestants",
         public_id: c.fileId,
         overwrite: false,
+        format: "jpg",
         transformation: [{ width: 800, height: 800, crop: "limit" }],
       })
       imageUrl = upload.secure_url
