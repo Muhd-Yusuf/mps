@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
-import { Save, RotateCw, Tag, Flame, CheckCircle2, Clock, XCircle } from "lucide-react"
+import { Save, RotateCw, Tag, Flame, CheckCircle2, Clock, XCircle, Eye, EyeOff } from "lucide-react"
 
 import { STAGE_PRESETS, getPreset } from "@/lib/stages"
 
@@ -34,6 +34,8 @@ export default function AdminSettings() {
     const [roundLabel, setRoundLabel] = useState<string>("")
     const [presetKey, setPresetKey] = useState<string>("team_voting")
     const [deadlineInput, setDeadlineInput] = useState<string>("")
+    const [revealed, setRevealed] = useState(false)
+    const [isSavingReveal, setIsSavingReveal] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const [isSavingLabel, setIsSavingLabel] = useState(false)
     const [isSavingRoundLabel, setIsSavingRoundLabel] = useState(false)
@@ -48,11 +50,12 @@ export default function AdminSettings() {
     const fetchSettings = async () => {
         try {
             setIsLoading(true)
-            const [labelRes, roundRes, presetRes, deadlineRes] = await Promise.all([
+            const [labelRes, roundRes, presetRes, deadlineRes, revealRes] = await Promise.all([
                 fetch("/api/settings/label"),
                 fetch("/api/settings/round"),
                 fetch("/api/settings/preset"),
                 fetch("/api/settings/deadline"),
+                fetch("/api/settings/reveal"),
             ])
             if (labelRes.ok) setTeamLabel((await labelRes.json()).label)
             if (roundRes.ok) {
@@ -65,6 +68,7 @@ export default function AdminSettings() {
                 const deadlineData = await deadlineRes.json()
                 setDeadlineInput(deadlineData.deadline ? toLocalInputValue(deadlineData.deadline) : "")
             }
+            if (revealRes.ok) setRevealed((await revealRes.json()).revealed === true)
         } catch (error) {
             toast.error("Error loading settings")
             console.error(error)
@@ -127,6 +131,33 @@ export default function AdminSettings() {
             toast.error(error.message || "Error saving deadline")
         } finally {
             setIsSavingDeadline(false)
+        }
+    }
+
+    const handleToggleReveal = async () => {
+        const next = !revealed
+        const message = next
+            ? "Publish the current stage results on the public /results page? Only do this AFTER the official live announcement."
+            : "Hide the public results page again?"
+        if (!confirm(message)) return
+        try {
+            setIsSavingReveal(true)
+            const response = await fetch("/api/settings/reveal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ revealed: next }),
+            })
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(typeof data.error === "string" ? data.error : "Failed to update results page")
+            }
+            const data = await response.json()
+            setRevealed(data.revealed === true)
+            toast.success(data.revealed ? "Results are now public at /results" : "Results page hidden")
+        } catch (error: any) {
+            toast.error(error.message || "Error updating results page")
+        } finally {
+            setIsSavingReveal(false)
         }
     }
 
@@ -357,6 +388,35 @@ export default function AdminSettings() {
                                 Start New Round
                             </>
                         )}
+                    </Button>
+                </CardContent>
+            </Card>
+
+            <Card className="bg-white border-border/40 backdrop-blur shadow-sm">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        {revealed ? <Eye className="w-5 h-5 text-primary" /> : <EyeOff className="w-5 h-5 text-primary" />}
+                        <CardTitle>Public Results Page</CardTitle>
+                    </div>
+                    <CardDescription>
+                        The public <strong>/results</strong> page is {revealed ? "LIVE — everyone can see the stage results." : "hidden. Flip it on only after MPS Media announces the results live, never before."}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button
+                        onClick={handleToggleReveal}
+                        disabled={isSavingReveal}
+                        className={revealed ? "" : "bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20"}
+                        variant={revealed ? "outline" : "default"}
+                    >
+                        {isSavingReveal ? (
+                            <Spinner size="sm" className="mr-2" />
+                        ) : revealed ? (
+                            <EyeOff className="w-4 h-4 mr-2" />
+                        ) : (
+                            <Eye className="w-4 h-4 mr-2" />
+                        )}
+                        {revealed ? "Hide Results Page" : "Publish Results Page"}
                     </Button>
                 </CardContent>
             </Card>
