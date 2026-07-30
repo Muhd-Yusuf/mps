@@ -178,6 +178,7 @@ for (const c of contestants) {
       {
         $push: {
           participants: {
+            _id: new mongoose.Types.ObjectId(),
             name: displayName,
             image: imageUrl,
             votes: 0,

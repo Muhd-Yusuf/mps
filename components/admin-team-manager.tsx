@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Image from "next/image"
-import { Plus, UserPlus, Trash2, Edit2, Radio, Flame } from "lucide-react"
+import { Plus, UserPlus, Trash2, Edit2, Radio, Flame, ArrowRightLeft } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 
 import type { Team, Participant } from "@/lib/types"
@@ -31,6 +31,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { Separator } from "@/components/ui/separator"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type AdminTeamManagerProps = {
   teams: Team[]
@@ -97,6 +104,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
   const [isDeletingTeam, setIsDeletingTeam] = useState(false)
   const [togglingTeamId, setTogglingTeamId] = useState<string | null>(null)
   const [togglingDangerId, setTogglingDangerId] = useState<string | null>(null)
+  const [movingParticipantId, setMovingParticipantId] = useState<string | null>(null)
 
   const teamOptions = useMemo(() => teams ?? [], [teams])
 
@@ -598,6 +606,38 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
     }
   }
 
+  // Blind Audition flow: when a coach picks a poet, move them from the
+  // "Contestants" pool into that coach's team. Votes and photo travel along.
+  const handleMoveParticipant = async (fromTeam: Team, participant: Participant, toTeam: Team) => {
+    try {
+      setMovingParticipantId(participant.id)
+      const response = await fetch(`/api/teams/${fromTeam.id}/participants/${participant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toTeamId: toTeam.id }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error?.error ?? "Unable to move poet")
+      }
+
+      toast({
+        title: "Poet moved",
+        description: `${participant.name} is now in ${toTeam.name}.`,
+      })
+      await onRefresh?.()
+    } catch (error: any) {
+      toast({
+        title: "Failed to move poet",
+        description: error?.message ?? "Please try again later",
+        variant: "destructive",
+      })
+    } finally {
+      setMovingParticipantId(null)
+    }
+  }
+
   const openDeleteDialog = (team: Team) => {
     setDeleteDialog({ open: true, teamId: team.id, teamName: team.name })
   }
@@ -934,6 +974,42 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                         <Badge variant="outline" className="text-foreground">
                           {participant.votes && participant.votes > 0 ? "Competing" : "New"}
                         </Badge>
+                        {teams.length > 1 && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={movingParticipantId === participant.id}
+                                className="border-border/40 hover:bg-muted"
+                              >
+                                {movingParticipantId === participant.id ? (
+                                  <Spinner size="sm" className="mr-2" />
+                                ) : (
+                                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                )}
+                                Move to
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Move {participant.name} to…</DropdownMenuLabel>
+                              {teams
+                                .filter((t) => t.id !== team.id)
+                                .map((t) => (
+                                  <DropdownMenuItem
+                                    key={t.id}
+                                    onClick={() => handleMoveParticipant(team, participant, t)}
+                                  >
+                                    <span
+                                      className="mr-2 inline-block h-2.5 w-2.5 rounded-full"
+                                      style={{ backgroundColor: t.color }}
+                                    />
+                                    {t.name}
+                                  </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"

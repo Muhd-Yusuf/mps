@@ -46,7 +46,7 @@ function serializeTeam(team: any, includeVotes = true) {
     votingOpen: team.votingOpen ?? false,
     order: team.order ?? 0,
     participants: (team.participants || []).map((participant: any) => ({
-      id: participant._id.toString(),
+      id: participant._id?.toString() ?? "",
       name: participant.name,
       image: participant.image,
       votes: includeVotes ? participant.votes ?? 0 : 0,
