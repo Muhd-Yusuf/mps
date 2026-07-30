@@ -38,6 +38,15 @@ export async function POST(request: Request) {
     const modeSetting = await SettingModel.findOne({ key: "voting_mode" }).lean()
     const votingMode = modeSetting?.value === "danger" ? "danger" : "teams"
 
+    // Voting deadline: enforced server-side so voting auto-closes on time.
+    const deadlineSetting = await SettingModel.findOne({ key: "voting_deadline" }).lean()
+    if (deadlineSetting?.value) {
+      const deadline = new Date(deadlineSetting.value)
+      if (!Number.isNaN(deadline.getTime()) && Date.now() > deadline.getTime()) {
+        return NextResponse.json({ error: "Voting has closed for this stage" }, { status: 400 })
+      }
+    }
+
     // Verify ticket
     const ticket = await TicketModel.findOne({
       votingCode: parsed.data.votingCode.toUpperCase().trim(),

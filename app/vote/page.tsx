@@ -6,13 +6,24 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import VotingCard from "@/components/voting-card"
-import { ArrowLeft, Lock, AlertCircle, Flame } from "lucide-react"
+import { ArrowLeft, Lock, AlertCircle, Flame, Clock } from "lucide-react"
 import { Spinner, LoadingSpinner } from "@/components/ui/spinner"
 import Link from "next/link"
 import Image from "next/image"
 import { toast } from "sonner"
 
 import { getPreset, type StagePreset } from "@/lib/stages"
+
+function formatCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+}
 
 // Danger-list poets are shown in a random order.
 function shuffle<T>(items: T[]): T[] {
@@ -41,17 +52,30 @@ export default function VotePage() {
   const [preset, setPreset] = useState<StagePreset>(getPreset(null))
   // Semi Final groups the danger list under team headers; other danger stages are flat.
   const [dangerGroups, setDangerGroups] = useState<{ id: string; name: string; poets: Participant[] }[]>([])
+  const [deadline, setDeadline] = useState<Date | null>(null)
+  const [now, setNow] = useState(() => Date.now())
 
   const mode = preset.mode
+
+  // Tick every second while a deadline is set so the countdown stays live and
+  // the page flips to "closed" the moment the deadline passes.
+  useEffect(() => {
+    if (!deadline) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [deadline])
+
+  const deadlinePassed = deadline ? now > deadline.getTime() : false
 
   const fetchTeams = useCallback(async () => {
     try {
       setIsLoading(true)
       setLoadError(null)
-      const [teamsResponse, labelResponse, presetResponse] = await Promise.all([
+      const [teamsResponse, labelResponse, presetResponse, deadlineResponse] = await Promise.all([
         fetch("/api/teams", { cache: "no-store" }),
         fetch("/api/settings/label", { cache: "no-store" }),
         fetch("/api/settings/preset", { cache: "no-store" }),
+        fetch("/api/settings/deadline", { cache: "no-store" }),
       ])
 
       if (!teamsResponse.ok) {
@@ -61,6 +85,12 @@ export default function VotePage() {
       if (labelResponse.ok) {
         const labelData = await labelResponse.json()
         setTeamLabel(labelData.label || "Team")
+      }
+
+      if (deadlineResponse.ok) {
+        const deadlineData = await deadlineResponse.json()
+        const parsedDeadline = deadlineData?.deadline ? new Date(deadlineData.deadline) : null
+        setDeadline(parsedDeadline && !Number.isNaN(parsedDeadline.getTime()) ? parsedDeadline : null)
       }
 
       let currentPreset = getPreset(null)
@@ -284,6 +314,9 @@ export default function VotePage() {
                   Don't have a code? Get one now
                 </Button>
               </Link>
+              <Link href="/resend-code" className="block text-center text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4">
+                Lost your code? Re-send it to my email
+              </Link>
             </CardContent>
           </Card>
         </div>
@@ -368,7 +401,19 @@ export default function VotePage() {
           </Card>
         )}
 
-        {!isLoading && !loadError && !hasVotableContent && (
+        {!isLoading && !loadError && deadlinePassed && (
+          <Card className="bg-card/50 border-border/40 backdrop-blur">
+            <CardContent className="pt-6 text-center py-12">
+              <Clock className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-lg font-semibold text-foreground mb-1">Voting has closed</p>
+              <p className="text-muted-foreground">
+                This stage's voting deadline has passed. Follow MPS Media for the official results.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isLoading && !loadError && !deadlinePassed && !hasVotableContent && (
           <Card className="bg-card/50 border-border/40 backdrop-blur">
             <CardContent className="pt-6 text-center py-12">
               <p className="text-muted-foreground">Voting is not open right now. Please check back later.</p>
@@ -376,9 +421,22 @@ export default function VotePage() {
           </Card>
         )}
 
-        {!isLoading && !loadError && hasVotableContent && (
+        {!isLoading && !loadError && !deadlinePassed && hasVotableContent && (
           <div className="grid lg:grid-cols-3 gap-6 sm:gap-8">
             <div className="lg:col-span-2">
+              {deadline && (
+                <div
+                  className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-xl border text-sm font-semibold"
+                  style={{
+                    borderColor: `${preset.accentColor}55`,
+                    background: `${preset.accentColor}0d`,
+                    color: preset.accentColor,
+                  }}
+                >
+                  <Clock className="w-4 h-4 flex-shrink-0" />
+                  Voting closes in {formatCountdown(deadline.getTime() - now)}
+                </div>
+              )}
               {mode === "danger" ? (
                 <>
                   {/* Danger-list stage: heading, copy and accent come from the stage preset */}

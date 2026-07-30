@@ -6,9 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
-import { Save, RotateCw, Tag, Flame, CheckCircle2 } from "lucide-react"
+import { Save, RotateCw, Tag, Flame, CheckCircle2, Clock, XCircle } from "lucide-react"
 
 import { STAGE_PRESETS, getPreset } from "@/lib/stages"
+
+// ISO timestamp -> value for <input type="datetime-local"> in the admin's timezone.
+function toLocalInputValue(iso: string): string {
+    const date = new Date(iso)
+    if (Number.isNaN(date.getTime())) return ""
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 
 function advancementText(presetKey: string): string {
     const preset = getPreset(presetKey)
@@ -25,11 +33,13 @@ export default function AdminSettings() {
     const [round, setRound] = useState<number>(1)
     const [roundLabel, setRoundLabel] = useState<string>("")
     const [presetKey, setPresetKey] = useState<string>("team_voting")
+    const [deadlineInput, setDeadlineInput] = useState<string>("")
     const [isLoading, setIsLoading] = useState(true)
     const [isSavingLabel, setIsSavingLabel] = useState(false)
     const [isSavingRoundLabel, setIsSavingRoundLabel] = useState(false)
     const [isAdvancing, setIsAdvancing] = useState(false)
     const [isSavingPreset, setIsSavingPreset] = useState(false)
+    const [isSavingDeadline, setIsSavingDeadline] = useState(false)
 
     useEffect(() => {
         fetchSettings()
@@ -38,10 +48,11 @@ export default function AdminSettings() {
     const fetchSettings = async () => {
         try {
             setIsLoading(true)
-            const [labelRes, roundRes, presetRes] = await Promise.all([
+            const [labelRes, roundRes, presetRes, deadlineRes] = await Promise.all([
                 fetch("/api/settings/label"),
                 fetch("/api/settings/round"),
                 fetch("/api/settings/preset"),
+                fetch("/api/settings/deadline"),
             ])
             if (labelRes.ok) setTeamLabel((await labelRes.json()).label)
             if (roundRes.ok) {
@@ -50,6 +61,10 @@ export default function AdminSettings() {
                 setRoundLabel(roundData.label ?? "")
             }
             if (presetRes.ok) setPresetKey(getPreset((await presetRes.json()).preset).key)
+            if (deadlineRes.ok) {
+                const deadlineData = await deadlineRes.json()
+                setDeadlineInput(deadlineData.deadline ? toLocalInputValue(deadlineData.deadline) : "")
+            }
         } catch (error) {
             toast.error("Error loading settings")
             console.error(error)
@@ -84,6 +99,34 @@ export default function AdminSettings() {
             toast.error(error.message || "Error switching stage")
         } finally {
             setIsSavingPreset(false)
+        }
+    }
+
+    const handleSaveDeadline = async (clear: boolean) => {
+        if (!clear && !deadlineInput) {
+            toast.error("Pick a date and time first")
+            return
+        }
+        if (clear && !confirm("Remove the voting deadline? Voting stays open until you close it manually.")) return
+        try {
+            setIsSavingDeadline(true)
+            const iso = clear ? "" : new Date(deadlineInput).toISOString()
+            const response = await fetch("/api/settings/deadline", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ deadline: iso }),
+            })
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(typeof data.error === "string" ? data.error : "Failed to save deadline")
+            }
+            const data = await response.json()
+            setDeadlineInput(data.deadline ? toLocalInputValue(data.deadline) : "")
+            toast.success(clear ? "Deadline removed — voting stays open" : "Deadline set — voting closes automatically")
+        } catch (error: any) {
+            toast.error(error.message || "Error saving deadline")
+        } finally {
+            setIsSavingDeadline(false)
         }
     }
 
@@ -218,6 +261,46 @@ export default function AdminSettings() {
                                 </button>
                             )
                         })}
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card className="bg-white border-border/40 backdrop-blur shadow-sm">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-primary" />
+                        <CardTitle>Voting Deadline</CardTitle>
+                    </div>
+                    <CardDescription>
+                        Voting closes automatically at this time — voters see a live countdown, and late votes
+                        are rejected even if no admin is online. Leave empty to keep voting open until you close it.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex flex-wrap gap-3 items-center">
+                        <Input
+                            type="datetime-local"
+                            value={deadlineInput}
+                            onChange={(e) => setDeadlineInput(e.target.value)}
+                            className="max-w-[240px]"
+                        />
+                        <Button
+                            onClick={() => handleSaveDeadline(false)}
+                            disabled={isSavingDeadline}
+                            className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20"
+                        >
+                            {isSavingDeadline ? <Spinner size="sm" className="mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                            Set Deadline
+                        </Button>
+                        <Button
+                            onClick={() => handleSaveDeadline(true)}
+                            disabled={isSavingDeadline}
+                            variant="outline"
+                            className="border-border/40 hover:bg-muted"
+                        >
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Remove
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
