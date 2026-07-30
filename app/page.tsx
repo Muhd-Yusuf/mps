@@ -4,8 +4,61 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowRight, Sparkles, Users, TrendingUp, Menu, X } from "lucide-react"
+import { ArrowRight, Menu, X, Mic, Swords, Flame, Trophy, Users, MapPin, Ticket, Vote, Megaphone, ClipboardCheck, Star } from "lucide-react"
 // import { PartnersCarousel } from "@/components/partners-carousel"
+
+// The competition journey, straight from the Official Contestants' Manual.
+const JOURNEY = [
+  {
+    icon: ClipboardCheck,
+    title: "Screening",
+    body: "Applications reviewed — at least 80 poets selected per subregion.",
+    publicVote: false,
+  },
+  {
+    icon: Mic,
+    title: "Blind Audition",
+    body: "Poets perform unseen; coaches judge by voice alone. Unpicked poets enter the Danger Zone — your vote revives up to 6.",
+    publicVote: true,
+  },
+  {
+    icon: Swords,
+    title: "Battle Round",
+    body: "Head-to-head duets within each team. Losing poets can be Saved, Stolen — or revived by 5 audience votes.",
+    publicVote: true,
+  },
+  {
+    icon: Star,
+    title: "Knockout Stage",
+    body: "Solo original poems. Judges pick their qualifiers, and the audience votes 4 more poets into the Regional Finals.",
+    publicVote: true,
+  },
+  {
+    icon: Users,
+    title: "Quarter Final — Abuja",
+    body: "42 poets, 5 new teams, new coaches. The audience advances the top 2 poets from every team.",
+    publicVote: true,
+  },
+  {
+    icon: Flame,
+    title: "Semi Final",
+    body: "Judges save one poet per team. The rest face the Danger Zone — your vote saves one more from each team.",
+    publicVote: true,
+  },
+  {
+    icon: Trophy,
+    title: "Grand Finale",
+    body: "10 finalists. 100% judges' scores. One Grand Champion — the Arewa Poet of the Year.",
+    publicVote: false,
+  },
+]
+
+const EVENTS = [
+  { region: "North-East", city: "Bauchi", month: "August 2026" },
+  { region: "North-West", city: "Kaduna", month: "September 2026" },
+  { region: "North-Central", city: "Nasarawa", month: "October 2026" },
+  { region: "Regional Finals", city: "Abuja", month: "November 2026" },
+]
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -156,6 +209,129 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* The Journey — stage-by-stage, from the Contestants' Manual */}
+      <section className="py-16 sm:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-3">The Journey</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              From over 240 poets across Arewa to one Grand Champion. Seven stages — and at five of them,
+              <strong> your vote decides who stays</strong>.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {JOURNEY.map((stage, index) => (
+              <Card key={stage.title} className="bg-white border-border/40 hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                      <stage.icon className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="text-xs font-bold text-muted-foreground">STAGE {index + 1}</span>
+                  </div>
+                  <CardTitle className="text-lg pt-2">{stage.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{stage.body}</p>
+                  {stage.publicVote && (
+                    <span className="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-primary">
+                      <Vote className="w-3.5 h-3.5" /> Public voting stage
+                    </span>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+
+            {/* CTA card completes the grid */}
+            <Card className="bg-gradient-to-br from-primary to-accent border-0 flex flex-col justify-center">
+              <CardContent className="py-8 text-center">
+                <p className="text-white font-bold text-lg mb-4">Your vote writes the story.</p>
+                <Link href="/purchase">
+                  <Button size="lg" variant="secondary" className="font-bold">
+                    Buy Voting Code
+                    <ArrowRight className="ml-2 w-5 h-5" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Subregions & key dates */}
+      <section className="py-16 bg-secondary/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-3">Three Subregions. One Stage in Abuja.</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              The 2026 Arewa Edition tours the North before the champions converge at the Regional Finals.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {EVENTS.map((event) => (
+              <Card key={event.region} className="bg-white border-border/40 text-center">
+                <CardContent className="py-6">
+                  <MapPin className="w-6 h-6 mx-auto mb-3 text-primary" />
+                  <p className="font-bold text-foreground">{event.region}</p>
+                  <p className="text-sm text-muted-foreground">{event.city}</p>
+                  <p className="text-sm font-semibold text-primary mt-2">{event.month}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How voting works */}
+      <section className="py-16 sm:py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-3">How Voting Works</h2>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-6">
+            {[
+              {
+                icon: Ticket,
+                title: "1. Get Your Code",
+                body: "Buy a voting code — it's delivered instantly to your email.",
+              },
+              {
+                icon: Vote,
+                title: "2. Cast Your Vote",
+                body: "Enter your code and pick the one poet you want to keep in the competition.",
+              },
+              {
+                icon: Megaphone,
+                title: "3. Results Announced",
+                body: "MPS Media announces who advances at the live event. Every vote counts.",
+              },
+            ].map((step) => (
+              <Card key={step.title} className="bg-white border-border/40 text-center">
+                <CardContent className="py-8">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-4">
+                    <step.icon className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="font-bold text-foreground mb-2">{step.title}</p>
+                  <p className="text-sm text-muted-foreground">{step.body}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="text-center mt-10">
+            <Link href="/purchase">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 font-bold text-lg px-10"
+              >
+                Buy Voting Code
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* Partners Section — hidden for now */}
       {/* <PartnersCarousel /> */}
