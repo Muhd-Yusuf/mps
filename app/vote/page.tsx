@@ -14,16 +14,7 @@ import { toast } from "sonner"
 
 import { getPreset, type StagePreset } from "@/lib/stages"
 
-function formatCountdown(ms: number) {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
-  const days = Math.floor(totalSeconds / 86400)
-  const hours = Math.floor((totalSeconds % 86400) / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-  if (days > 0) return `${days}d ${hours}h ${minutes}m`
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-}
+import { formatCountdown } from "@/lib/countdown"
 
 // Danger-list poets are shown in a random order.
 function shuffle<T>(items: T[]): T[] {
@@ -53,29 +44,32 @@ export default function VotePage() {
   // Semi Final groups the danger list under team headers; other danger stages are flat.
   const [dangerGroups, setDangerGroups] = useState<{ id: string; name: string; poets: Participant[] }[]>([])
   const [deadline, setDeadline] = useState<Date | null>(null)
+  const [votingStart, setVotingStart] = useState<Date | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
   const mode = preset.mode
 
-  // Tick every second while a deadline is set so the countdown stays live and
-  // the page flips to "closed" the moment the deadline passes.
+  // Tick every second while a schedule is set so the countdowns stay live and
+  // the page flips open/closed the moment a boundary passes.
   useEffect(() => {
-    if (!deadline) return
+    if (!deadline && !votingStart) return
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [deadline])
+  }, [deadline, votingStart])
 
   const deadlinePassed = deadline ? now > deadline.getTime() : false
+  const startPending = votingStart ? now < votingStart.getTime() : false
 
   const fetchTeams = useCallback(async () => {
     try {
       setIsLoading(true)
       setLoadError(null)
-      const [teamsResponse, labelResponse, presetResponse, deadlineResponse] = await Promise.all([
+      const [teamsResponse, labelResponse, presetResponse, deadlineResponse, startResponse] = await Promise.all([
         fetch("/api/teams", { cache: "no-store" }),
         fetch("/api/settings/label", { cache: "no-store" }),
         fetch("/api/settings/preset", { cache: "no-store" }),
         fetch("/api/settings/deadline", { cache: "no-store" }),
+        fetch("/api/settings/start", { cache: "no-store" }),
       ])
 
       if (!teamsResponse.ok) {
@@ -91,6 +85,11 @@ export default function VotePage() {
         const deadlineData = await deadlineResponse.json()
         const parsedDeadline = deadlineData?.deadline ? new Date(deadlineData.deadline) : null
         setDeadline(parsedDeadline && !Number.isNaN(parsedDeadline.getTime()) ? parsedDeadline : null)
+      }
+      if (startResponse.ok) {
+        const startData = await startResponse.json()
+        const parsedStart = startData?.start ? new Date(startData.start) : null
+        setVotingStart(parsedStart && !Number.isNaN(parsedStart.getTime()) ? parsedStart : null)
       }
 
       let currentPreset = getPreset(null)
@@ -401,7 +400,22 @@ export default function VotePage() {
           </Card>
         )}
 
-        {!isLoading && !loadError && deadlinePassed && (
+        {!isLoading && !loadError && startPending && votingStart && (
+          <Card className="bg-card/50 border-border/40 backdrop-blur">
+            <CardContent className="pt-6 text-center py-12">
+              <Clock className="w-8 h-8 mx-auto mb-3 text-primary" />
+              <p className="text-lg font-semibold text-foreground mb-1">Voting hasn&apos;t started yet</p>
+              <p className="text-3xl sm:text-4xl font-extrabold text-primary tabular-nums my-3">
+                {formatCountdown(votingStart.getTime() - now)}
+              </p>
+              <p className="text-muted-foreground">
+                Hold on to your voting code — this page opens automatically when the countdown ends.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isLoading && !loadError && !startPending && deadlinePassed && (
           <Card className="bg-card/50 border-border/40 backdrop-blur">
             <CardContent className="pt-6 text-center py-12">
               <Clock className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
@@ -413,7 +427,7 @@ export default function VotePage() {
           </Card>
         )}
 
-        {!isLoading && !loadError && !deadlinePassed && !hasVotableContent && (
+        {!isLoading && !loadError && !startPending && !deadlinePassed && !hasVotableContent && (
           <Card className="bg-card/50 border-border/40 backdrop-blur">
             <CardContent className="pt-6 text-center py-12">
               <p className="text-muted-foreground">Voting is not open right now. Please check back later.</p>
@@ -421,7 +435,7 @@ export default function VotePage() {
           </Card>
         )}
 
-        {!isLoading && !loadError && !deadlinePassed && hasVotableContent && (
+        {!isLoading && !loadError && !startPending && !deadlinePassed && hasVotableContent && (
           <div className="grid lg:grid-cols-3 gap-6 sm:gap-8">
             <div className="lg:col-span-2">
               {deadline && (

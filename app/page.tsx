@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowRight, Menu, X, Mic, Swords, Flame, Trophy, Users, MapPin, Ticket, Vote, Megaphone, ClipboardCheck, Star } from "lucide-react"
 
 import { getPreset } from "@/lib/stages"
+import { countdownParts, formatCountdown } from "@/lib/countdown"
 // import { PartnersCarousel } from "@/components/partners-carousel"
 
 // The competition journey, straight from the Official Contestants' Manual.
@@ -67,6 +68,20 @@ export default function Home() {
   const [stage, setStage] = useState("Discover Exceptional Talent")
   const [isScrolled, setIsScrolled] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [votingStart, setVotingStart] = useState<Date | null>(null)
+  const [votingDeadline, setVotingDeadline] = useState<Date | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
+  // Tick every second while a schedule exists so the hero countdown stays live.
+  useEffect(() => {
+    if (!votingStart && !votingDeadline) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [votingStart, votingDeadline])
+
+  const startPending = votingStart ? now < votingStart.getTime() : false
+  const deadlinePassed = votingDeadline ? now > votingDeadline.getTime() : false
+  const votingLive = !startPending && !deadlinePassed && (votingStart || votingDeadline)
 
   useEffect(() => {
     const init = async () => {
@@ -76,10 +91,22 @@ export default function Home() {
         try {
           // The banner always reflects the LIVE competition stage. The manual
           // banner text is only a fallback for the general Team Voting preset.
-          const [presetRes, stageRes] = await Promise.all([
+          const [presetRes, stageRes, startRes, deadlineRes] = await Promise.all([
             fetch("/api/settings/preset"),
             fetch("/api/settings/stage"),
+            fetch("/api/settings/start"),
+            fetch("/api/settings/deadline"),
           ])
+          if (startRes.ok) {
+            const startData = await startRes.json()
+            const parsedStart = startData?.start ? new Date(startData.start) : null
+            setVotingStart(parsedStart && !Number.isNaN(parsedStart.getTime()) ? parsedStart : null)
+          }
+          if (deadlineRes.ok) {
+            const deadlineData = await deadlineRes.json()
+            const parsedDeadline = deadlineData?.deadline ? new Date(deadlineData.deadline) : null
+            setVotingDeadline(parsedDeadline && !Number.isNaN(parsedDeadline.getTime()) ? parsedDeadline : null)
+          }
           let label = ""
           if (presetRes.ok) {
             label = getPreset((await presetRes.json()).preset).publicLabel
@@ -208,16 +235,90 @@ export default function Home() {
             <div className="inline-block mb-4 sm:mb-6 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
               <p className="text-sm sm:text-lg font-medium text-white">{stage}</p>
             </div>
+
+            {/* Voting-window countdown, driven by the admin's schedule */}
+            {startPending && votingStart && (
+              <div className="mb-6 sm:mb-8">
+                <p className="text-white/90 text-base sm:text-xl font-semibold mb-3 uppercase tracking-widest">
+                  Voting starts in
+                </p>
+                <div className="flex justify-center gap-2 sm:gap-4">
+                  {(() => {
+                    const parts = countdownParts(votingStart.getTime() - now)
+                    const blocks = [
+                      ...(parts.days > 0 ? [{ value: parts.days, label: "Days" }] : []),
+                      { value: parts.hours, label: "Hours" },
+                      { value: parts.minutes, label: "Minutes" },
+                      { value: parts.seconds, label: "Seconds" },
+                    ]
+                    return blocks.map((block) => (
+                      <div
+                        key={block.label}
+                        className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 sm:px-6 sm:py-4 min-w-[70px] sm:min-w-[100px]"
+                      >
+                        <p className="text-3xl sm:text-5xl font-extrabold text-white tabular-nums">
+                          {String(block.value).padStart(2, "0")}
+                        </p>
+                        <p className="text-[10px] sm:text-xs font-semibold text-white/70 uppercase tracking-widest mt-1">
+                          {block.label}
+                        </p>
+                      </div>
+                    ))
+                  })()}
+                </div>
+                <p className="text-white/70 text-sm sm:text-base mt-4">
+                  Get your voting code ready before voting opens.
+                </p>
+              </div>
+            )}
+
+            {votingLive && (
+              <div className="mb-6 sm:mb-8">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/20 backdrop-blur-sm border border-green-400/40">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+                  </span>
+                  <p className="text-sm sm:text-lg font-bold text-white">Voting is LIVE</p>
+                  {votingDeadline && (
+                    <p className="text-xs sm:text-sm text-white/80">
+                      · closes in {formatCountdown(votingDeadline.getTime() - now)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {deadlinePassed && (
+              <div className="mb-6 sm:mb-8">
+                <div className="inline-block px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+                  <p className="text-sm sm:text-lg font-semibold text-white">Voting has closed for this stage</p>
+                </div>
+              </div>
+            )}
+
             <br />
-            <Link href="/purchase">
-              <Button
-                size="lg"
-                className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 group font-bold p-10 text-2xl md:text-4xl"
-              >
-                Buy Voting Code
-                <ArrowRight className="ml-2 w-10 h-10 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
+            {votingLive ? (
+              <Link href="/vote">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 group font-bold p-10 text-2xl md:text-4xl"
+                >
+                  Vote Now
+                  <ArrowRight className="ml-2 w-10 h-10 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/purchase">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 group font-bold p-10 text-2xl md:text-4xl"
+                >
+                  Buy Voting Code
+                  <ArrowRight className="ml-2 w-10 h-10 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </div>

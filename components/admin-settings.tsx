@@ -34,6 +34,8 @@ export default function AdminSettings() {
     const [roundLabel, setRoundLabel] = useState<string>("")
     const [presetKey, setPresetKey] = useState<string>("team_voting")
     const [deadlineInput, setDeadlineInput] = useState<string>("")
+    const [startInput, setStartInput] = useState<string>("")
+    const [isSavingStart, setIsSavingStart] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const [isSavingLabel, setIsSavingLabel] = useState(false)
     const [isSavingRoundLabel, setIsSavingRoundLabel] = useState(false)
@@ -48,11 +50,12 @@ export default function AdminSettings() {
     const fetchSettings = async () => {
         try {
             setIsLoading(true)
-            const [labelRes, roundRes, presetRes, deadlineRes] = await Promise.all([
+            const [labelRes, roundRes, presetRes, deadlineRes, startRes] = await Promise.all([
                 fetch("/api/settings/label"),
                 fetch("/api/settings/round"),
                 fetch("/api/settings/preset"),
                 fetch("/api/settings/deadline"),
+                fetch("/api/settings/start"),
             ])
             if (labelRes.ok) setTeamLabel((await labelRes.json()).label)
             if (roundRes.ok) {
@@ -64,6 +67,10 @@ export default function AdminSettings() {
             if (deadlineRes.ok) {
                 const deadlineData = await deadlineRes.json()
                 setDeadlineInput(deadlineData.deadline ? toLocalInputValue(deadlineData.deadline) : "")
+            }
+            if (startRes.ok) {
+                const startData = await startRes.json()
+                setStartInput(startData.start ? toLocalInputValue(startData.start) : "")
             }
         } catch (error) {
             toast.error("Error loading settings")
@@ -99,6 +106,34 @@ export default function AdminSettings() {
             toast.error(error.message || "Error switching stage")
         } finally {
             setIsSavingPreset(false)
+        }
+    }
+
+    const handleSaveStart = async (clear: boolean) => {
+        if (!clear && !startInput) {
+            toast.error("Pick a date and time first")
+            return
+        }
+        if (clear && !confirm("Remove the scheduled start? Voting opens immediately (subject to the stage setup).")) return
+        try {
+            setIsSavingStart(true)
+            const iso = clear ? "" : new Date(startInput).toISOString()
+            const response = await fetch("/api/settings/start", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ start: iso }),
+            })
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(typeof data.error === "string" ? data.error : "Failed to save start time")
+            }
+            const data = await response.json()
+            setStartInput(data.start ? toLocalInputValue(data.start) : "")
+            toast.success(clear ? "Scheduled start removed — voting is open now" : "Start time set — the site shows a countdown until then")
+        } catch (error: any) {
+            toast.error(error.message || "Error saving start time")
+        } finally {
+            setIsSavingStart(false)
         }
     }
 
@@ -269,38 +304,70 @@ export default function AdminSettings() {
                 <CardHeader>
                     <div className="flex items-center gap-2">
                         <Clock className="w-5 h-5 text-primary" />
-                        <CardTitle>Voting Deadline</CardTitle>
+                        <CardTitle>Voting Schedule</CardTitle>
                     </div>
                     <CardDescription>
-                        Voting closes automatically at this time — voters see a live countdown, and late votes
-                        are rejected even if no admin is online. Leave empty to keep voting open until you close it.
+                        Both times are enforced automatically, even with no admin online. Before the start time,
+                        the homepage shows a live &ldquo;Voting starts in…&rdquo; countdown and votes are rejected.
+                        After the deadline, voting closes. Leave either empty to skip it.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex flex-wrap gap-3 items-center">
-                        <Input
-                            type="datetime-local"
-                            value={deadlineInput}
-                            onChange={(e) => setDeadlineInput(e.target.value)}
-                            className="max-w-[240px]"
-                        />
-                        <Button
-                            onClick={() => handleSaveDeadline(false)}
-                            disabled={isSavingDeadline}
-                            className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20"
-                        >
-                            {isSavingDeadline ? <Spinner size="sm" className="mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                            Set Deadline
-                        </Button>
-                        <Button
-                            onClick={() => handleSaveDeadline(true)}
-                            disabled={isSavingDeadline}
-                            variant="outline"
-                            className="border-border/40 hover:bg-muted"
-                        >
-                            <XCircle className="w-4 h-4 mr-2" />
-                            Remove
-                        </Button>
+                <CardContent className="space-y-5">
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium text-foreground">Voting opens</p>
+                        <div className="flex flex-wrap gap-3 items-center">
+                            <Input
+                                type="datetime-local"
+                                value={startInput}
+                                onChange={(e) => setStartInput(e.target.value)}
+                                className="max-w-[240px]"
+                            />
+                            <Button
+                                onClick={() => handleSaveStart(false)}
+                                disabled={isSavingStart}
+                                className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20"
+                            >
+                                {isSavingStart ? <Spinner size="sm" className="mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                Set Start
+                            </Button>
+                            <Button
+                                onClick={() => handleSaveStart(true)}
+                                disabled={isSavingStart}
+                                variant="outline"
+                                className="border-border/40 hover:bg-muted"
+                            >
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Remove
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium text-foreground">Voting closes</p>
+                        <div className="flex flex-wrap gap-3 items-center">
+                            <Input
+                                type="datetime-local"
+                                value={deadlineInput}
+                                onChange={(e) => setDeadlineInput(e.target.value)}
+                                className="max-w-[240px]"
+                            />
+                            <Button
+                                onClick={() => handleSaveDeadline(false)}
+                                disabled={isSavingDeadline}
+                                className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20"
+                            >
+                                {isSavingDeadline ? <Spinner size="sm" className="mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                Set Deadline
+                            </Button>
+                            <Button
+                                onClick={() => handleSaveDeadline(true)}
+                                disabled={isSavingDeadline}
+                                variant="outline"
+                                className="border-border/40 hover:bg-muted"
+                            >
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Remove
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

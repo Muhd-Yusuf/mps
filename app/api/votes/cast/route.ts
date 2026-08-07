@@ -38,8 +38,18 @@ export async function POST(request: Request) {
     const modeSetting = await SettingModel.findOne({ key: "voting_mode" }).lean()
     const votingMode = modeSetting?.value === "danger" ? "danger" : "teams"
 
-    // Voting deadline: enforced server-side so voting auto-closes on time.
-    const deadlineSetting = await SettingModel.findOne({ key: "voting_deadline" }).lean()
+    // Voting window: both ends enforced server-side so the public countdown is
+    // real — no votes before the scheduled start or after the deadline.
+    const [startSetting, deadlineSetting] = await Promise.all([
+      SettingModel.findOne({ key: "voting_start" }).lean(),
+      SettingModel.findOne({ key: "voting_deadline" }).lean(),
+    ])
+    if (startSetting?.value) {
+      const start = new Date(startSetting.value)
+      if (!Number.isNaN(start.getTime()) && Date.now() < start.getTime()) {
+        return NextResponse.json({ error: "Voting has not started yet" }, { status: 400 })
+      }
+    }
     if (deadlineSetting?.value) {
       const deadline = new Date(deadlineSetting.value)
       if (!Number.isNaN(deadline.getTime()) && Date.now() > deadline.getTime()) {
