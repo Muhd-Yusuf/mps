@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 
 import { connectToDatabase, TeamModel } from "@/lib/mongodb"
 import { authOptions } from "@/lib/auth"
+import { finalizeStageIfDue } from "@/lib/finalize"
 
 const coachSchema = z.object({
   name: z.string().min(1, "Coach name is required"),
@@ -64,6 +65,9 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     await connectToDatabase()
+    // Applies the automatic top-N advancement the first time anyone loads
+    // teams after a danger-stage deadline has passed.
+    await finalizeStageIfDue().catch((error) => console.error("[AUTO_FINALIZE_ERROR]", error))
     const teams = await TeamModel.find().sort({ order: 1, createdAt: 1 }).lean()
 
     return NextResponse.json({ teams: teams.map((team) => serializeTeam(team, Boolean(session))) })

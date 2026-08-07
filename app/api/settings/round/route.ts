@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     // drop the old round's name so reports can't mislabel the new event.
     const label = (parsed.data.label ?? "").trim()
     await Promise.all([
-      TeamModel.updateMany({}, { $set: { votingOpen: false, "participants.$[].votes": 0 } }),
+      TeamModel.updateMany({}, { $set: { votingOpen: false, "participants.$[].votes": 0, "participants.$[].inDanger": false } }),
       SettingModel.findOneAndUpdate({ key: ROUND_LABEL_KEY }, { value: label }, { upsert: true }),
     ])
 

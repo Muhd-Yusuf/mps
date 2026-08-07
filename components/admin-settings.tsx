@@ -253,7 +253,9 @@ export default function AdminSettings() {
                     </div>
                     <CardDescription>
                         Pick the stage the competition is in right now. Each stage sets what voters see, which
-                        poets are votable, and how results are counted in reports.
+                        poets are votable, and how results are counted in reports. For Danger Zone stages, when
+                        the voting deadline passes the top poets <strong>advance automatically</strong> — the rest
+                        are moved to the &ldquo;Eliminated&rdquo; team.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
