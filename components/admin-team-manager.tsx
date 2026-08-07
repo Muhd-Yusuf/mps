@@ -988,11 +988,11 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                                 ) : (
                                   <ArrowRightLeft className="mr-2 h-4 w-4" />
                                 )}
-                                Move to
+                                Assign Team
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Move {participant.name} to…</DropdownMenuLabel>
+                              <DropdownMenuLabel>Assign {participant.name} to…</DropdownMenuLabel>
                               {teams
                                 .filter((t) => t.id !== team.id)
                                 .map((t) => (
