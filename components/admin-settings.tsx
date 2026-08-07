@@ -210,7 +210,7 @@ export default function AdminSettings() {
     }
 
     const handleAdvanceRound = async () => {
-        if (!confirm("Start a new round? This closes voting on all teams, clears the round name, and lets everyone buy a new ticket.")) {
+        if (!confirm("Start a new round? This closes all teams, RESETS every poet's vote counter to zero for the new stage, clears the round name, and lets everyone buy a new ticket.\n\nDownload this round's reports FIRST — the on-screen counters start over (full history stays stored).")) {
             return
         }
         try {

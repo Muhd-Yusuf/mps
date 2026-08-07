@@ -66,11 +66,13 @@ export async function POST(request: Request) {
       { upsert: true, new: true }
     )
 
-    // A new round starts from a clean slate: close every team's voting and
+    // A new round starts from a clean slate: close every team's voting, zero
+    // every poet's vote counter (previous rounds' votes must not carry into the
+    // next stage's ranking — full history stays in the votes collection), and
     // drop the old round's name so reports can't mislabel the new event.
     const label = (parsed.data.label ?? "").trim()
     await Promise.all([
-      TeamModel.updateMany({}, { $set: { votingOpen: false } }),
+      TeamModel.updateMany({}, { $set: { votingOpen: false, "participants.$[].votes": 0 } }),
       SettingModel.findOneAndUpdate({ key: ROUND_LABEL_KEY }, { value: label }, { upsert: true }),
     ])
 

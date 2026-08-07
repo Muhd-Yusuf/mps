@@ -128,6 +128,7 @@ export async function POST(request: Request) {
       ticketId: ticket._id,
       participantId: selection.participantId,
       teamId: selection.teamId,
+      round: currentRound,
     })
 
     await TeamModel.updateOne(
