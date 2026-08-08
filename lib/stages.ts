@@ -3,10 +3,10 @@
 // Regional Finals in Abuja. Each public-voting stage has its own mechanics:
 //
 //   Blind Audition  — poets no coach picked enter the Danger Zone; audience
-//                     revives the top 3 (flat random list, no team grouping).
+//                     revives the top 6 (flat random list, no team grouping).
 //   Battle Round    — losing poets from the head-to-head battles; audience
-//                     revives the top 3 (flat random list).
-//   Knockout Stage  — audience vote runs alongside the judges; the top 3
+//                     revives the top 5 (flat random list).
+//   Knockout Stage  — audience vote runs alongside the judges; the top 4
 //                     audience-voted poets advance to the Regional Finals.
 //   Quarter Final   — 5 new teams in Abuja; audience advances the top 2 POETS
 //                     PER TEAM (normal team voting, results sliced per team).
@@ -71,7 +71,7 @@ export const STAGE_PRESETS: StagePreset[] = [
     description:
       "Choose who you want to keep in the competition. These poets were not picked by any coach — your vote decides who stays.",
     adminPrep: "Flag every poet no coach picked as Danger Zone, from the Teams tab.",
-    results: { slice: "overall", advance: 3, advanceLabel: "REVIVED" },
+    results: { slice: "overall", advance: 6, advanceLabel: "REVIVED" },
   },
   {
     key: "battle_round",
@@ -84,7 +84,7 @@ export const STAGE_PRESETS: StagePreset[] = [
     description:
       "These poets lost their head-to-head battles. Choose who you want to keep in the competition — your vote decides who is revived.",
     adminPrep: "Flag the poets who lost their battles (and were not Saved or Stolen) as Danger Zone.",
-    results: { slice: "overall", advance: 3, advanceLabel: "REVIVED" },
+    results: { slice: "overall", advance: 5, advanceLabel: "REVIVED" },
   },
   {
     key: "knockout",
@@ -97,7 +97,7 @@ export const STAGE_PRESETS: StagePreset[] = [
     description:
       "The judges have made their picks — now it's your turn. Vote for the poet you want to send to the Arewa Regional Finals in Abuja.",
     adminPrep: "Flag the poets still in contention for the audience slots as Danger Zone.",
-    results: { slice: "overall", advance: 3, advanceLabel: "ADVANCES" },
+    results: { slice: "overall", advance: 4, advanceLabel: "ADVANCES" },
   },
   {
     key: "quarter_final",
