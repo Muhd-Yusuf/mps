@@ -7,8 +7,12 @@ import { generateVotingCode } from "@/lib/code-utils"
 
 const initializeSchema = z.object({
   email: z.string().email("Invalid email address"),
-  amount: z.number().positive("Amount must be positive"),
+  // Accepted for backwards compatibility but IGNORED — the price is fixed
+  // server-side so nobody can tamper with the amount in the browser.
+  amount: z.number().optional(),
 })
+
+const TICKET_PRICE = parseInt(process.env.TICKET_PRICE || "2000", 10)
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
 const PAYSTACK_BASE_URL = "https://api.paystack.co"
@@ -152,11 +156,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // Create ticket record
+    // Create ticket record — always at the fixed server-side price.
     const ticket = await TicketModel.create({
       email: normalizedEmail,
       votingCode,
-      amount: parsed.data.amount,
+      amount: TICKET_PRICE,
       isPaid: false,
       round,
     })
@@ -165,7 +169,7 @@ export async function POST(request: Request) {
     const ticketId = ticket._id.toString()
     const paystackResponse: any = await makePaystackRequest("/transaction/initialize", {
       email: parsed.data.email,
-      amount: parsed.data.amount * 100, // Convert to kobo
+      amount: TICKET_PRICE * 100, // Convert to kobo
       reference: ticketId,
       metadata: {
         ticketId,

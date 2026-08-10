@@ -32,6 +32,8 @@ export default function AdminPage() {
   const [isLoadingTeams, setIsLoadingTeams] = useState(false)
   const [teamsError, setTeamsError] = useState<string | null>(null)
   const [totalRevenue, setTotalRevenue] = useState(0)
+  const [codesSold, setCodesSold] = useState(0)
+  const [codesUsed, setCodesUsed] = useState(0)
 
   const isAuthenticated = status === "authenticated"
   const isLoadingAuth = status === "loading"
@@ -114,6 +116,8 @@ export default function AdminPage() {
         const tickets: Ticket[] = data?.tickets ?? []
         const revenue = tickets.reduce((sum, ticket) => sum + ticket.amount, 0)
         setTotalRevenue(revenue)
+        setCodesSold(tickets.length)
+        setCodesUsed(tickets.filter((t) => t.hasVoted).length)
       } catch (error) {
         console.error("Error fetching revenue:", error)
       }
@@ -145,7 +149,13 @@ export default function AdminPage() {
     { label: "Total Votes", value: totalVotes },
     { label: "Teams", value: teams.length },
     { label: "Poets", value: totalParticipants },
-    { label: "Total Revenue", value: formattedTotalRevenue },
+    {
+      label: "Total Revenue",
+      value: formattedTotalRevenue,
+      // Sold vs used explains why revenue ≠ votes × price: some buyers
+      // haven't cast their vote yet.
+      note: `${codesSold} codes sold · ${codesUsed} used to vote`,
+    },
   ]
 
   if (isLoadingAuth) {
@@ -252,6 +262,9 @@ export default function AdminPage() {
                   </div>
                   <div className="text-3xl mb-1">{statsIcons[index]}</div>
                 </div>
+                {"note" in stat && stat.note && (
+                  <p className="mt-2 text-xs text-muted-foreground">{stat.note}</p>
+                )}
               </CardContent>
             </Card>
           ))}

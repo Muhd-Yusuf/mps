@@ -76,6 +76,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Ticket not found" }, { status: 404 })
     }
 
+    // The paid amount must cover the ticket price — otherwise someone
+    // initialized a cheaper transaction against our public key.
+    if (typeof verification.data.amount === "number" && verification.data.amount < (ticket.amount ?? 0) * 100) {
+      return NextResponse.json({ error: "Payment amount does not match the ticket price" }, { status: 400 })
+    }
+
     // Check if ticket was already paid to avoid sending duplicate emails
     const wasAlreadyPaid = ticket.isPaid
 

@@ -43,6 +43,13 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: "Ticket not found" }, { status: 404 })
             }
 
+            // The paid amount must cover the ticket price — otherwise someone
+            // initialized a cheaper transaction against our public key.
+            if (typeof event.data.amount === "number" && event.data.amount < (ticket.amount ?? 0) * 100) {
+                console.error(`Underpaid transaction ${reference}: got ${event.data.amount}, expected ${(ticket.amount ?? 0) * 100}`)
+                return NextResponse.json({ received: true, underpaid: true }, { status: 200 })
+            }
+
             // Check if ticket was already paid to avoid duplicate processing
             if (!ticket.isPaid) {
                 // One code per email per round: don't grant a second code if this
