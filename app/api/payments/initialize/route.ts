@@ -74,26 +74,51 @@ export async function POST(request: Request) {
 
     await connectToDatabase()
 
-    // A ticket can only be useful if there is something to vote on: an open team
-    // in regular mode, or at least one Danger Zone poet during blind auditions.
-    const modeSetting = await SettingModel.findOne({ key: "voting_mode" }).lean()
-    const votingMode = modeSetting?.value === "danger" ? "danger" : "teams"
-
-    if (votingMode === "danger") {
-      const dangerCount = await TeamModel.countDocuments({ "participants.inDanger": true })
-      if (dangerCount === 0) {
+    // Once the voting deadline has passed, code sales pause until the admin
+    // sets up the next stage. Before a scheduled start, sales are allowed so
+    // supporters can have their codes ready when voting opens.
+    const [startSetting, deadlineSetting] = await Promise.all([
+      SettingModel.findOne({ key: "voting_start" }).lean(),
+      SettingModel.findOne({ key: "voting_deadline" }).lean(),
+    ])
+    if (deadlineSetting?.value) {
+      const deadline = new Date(deadlineSetting.value)
+      if (!Number.isNaN(deadline.getTime()) && Date.now() > deadline.getTime()) {
         return NextResponse.json(
-          { error: "Voting is not open right now. Please wait for the next stage." },
+          { error: "Voting has closed for this stage. Code sales will resume when the next stage opens." },
           { status: 409 }
         )
       }
-    } else {
-      const openTeamCount = await TeamModel.countDocuments({ votingOpen: true })
-      if (openTeamCount === 0) {
-        return NextResponse.json(
-          { error: "Voting is not open right now. Please wait for the next round." },
-          { status: 409 }
-        )
+    }
+    let startPending = false
+    if (startSetting?.value) {
+      const start = new Date(startSetting.value)
+      startPending = !Number.isNaN(start.getTime()) && Date.now() < start.getTime()
+    }
+
+    // A ticket can only be useful if there is something to vote on: an open team
+    // in regular mode, or at least one Danger Zone poet during blind auditions.
+    // A scheduled future start also counts — the admin has announced the stage.
+    const modeSetting = await SettingModel.findOne({ key: "voting_mode" }).lean()
+    const votingMode = modeSetting?.value === "danger" ? "danger" : "teams"
+
+    if (!startPending) {
+      if (votingMode === "danger") {
+        const dangerCount = await TeamModel.countDocuments({ "participants.inDanger": true })
+        if (dangerCount === 0) {
+          return NextResponse.json(
+            { error: "Voting is not open right now. Please wait for the next stage." },
+            { status: 409 }
+          )
+        }
+      } else {
+        const openTeamCount = await TeamModel.countDocuments({ votingOpen: true })
+        if (openTeamCount === 0) {
+          return NextResponse.json(
+            { error: "Voting is not open right now. Please wait for the next round." },
+            { status: 409 }
+          )
+        }
       }
     }
 

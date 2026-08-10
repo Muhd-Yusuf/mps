@@ -70,6 +70,8 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [votingStart, setVotingStart] = useState<Date | null>(null)
   const [votingDeadline, setVotingDeadline] = useState<Date | null>(null)
+  // Whether anything is actually votable right now (open team / flagged poet).
+  const [votable, setVotable] = useState(true)
   const [now, setNow] = useState(() => Date.now())
 
   // Tick every second while a schedule exists so the hero countdown stays live.
@@ -81,7 +83,10 @@ export default function Home() {
 
   const startPending = votingStart ? now < votingStart.getTime() : false
   const deadlinePassed = votingDeadline ? now > votingDeadline.getTime() : false
-  const votingLive = !startPending && !deadlinePassed && (votingStart || votingDeadline)
+  const votingLive = !startPending && !deadlinePassed && votable && (votingStart || votingDeadline)
+  // Codes are sellable before/while voting runs, never after it closes and
+  // never when nothing is set up to vote on.
+  const purchasable = !deadlinePassed && (votable || startPending)
 
   useEffect(() => {
     const init = async () => {
@@ -91,11 +96,12 @@ export default function Home() {
         try {
           // The banner always reflects the LIVE competition stage. The manual
           // banner text is only a fallback for the general Team Voting preset.
-          const [presetRes, stageRes, startRes, deadlineRes] = await Promise.all([
+          const [presetRes, stageRes, startRes, deadlineRes, teamsRes] = await Promise.all([
             fetch("/api/settings/preset"),
             fetch("/api/settings/stage"),
             fetch("/api/settings/start"),
             fetch("/api/settings/deadline"),
+            fetch("/api/teams", { cache: "no-store" }),
           ])
           if (startRes.ok) {
             const startData = await startRes.json()
@@ -108,8 +114,19 @@ export default function Home() {
             setVotingDeadline(parsedDeadline && !Number.isNaN(parsedDeadline.getTime()) ? parsedDeadline : null)
           }
           let label = ""
+          let presetMode: "teams" | "danger" = "teams"
           if (presetRes.ok) {
-            label = getPreset((await presetRes.json()).preset).publicLabel
+            const preset = getPreset((await presetRes.json()).preset)
+            label = preset.publicLabel
+            presetMode = preset.mode
+          }
+          if (teamsRes.ok) {
+            const allTeams = (await teamsRes.json())?.teams ?? []
+            setVotable(
+              presetMode === "danger"
+                ? allTeams.some((t: any) => t.participants?.some((p: any) => p.inDanger))
+                : allTeams.some((t: any) => t.votingOpen)
+            )
           }
           if (!label && stageRes.ok) {
             const data = await stageRes.json()
@@ -179,42 +196,60 @@ export default function Home() {
               <span className="sr-only">Toggle menu</span>
             </Button>
           </div>
-          {/* Desktop Menu */}
+          {/* Desktop Menu — buttons follow the voting state */}
           <div className="hidden sm:flex flex-wrap gap-2 sm:gap-3 justify-center">
-            <Link href="/purchase">
-              <Button className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 group text-sm sm:text-base">
-                Buy Voting Code
-                <ArrowRight className="ml-2 w-8 h-8 font-extrabold group-hover:translate-x-1 transition-transform" />
+            {purchasable && (
+              <Link href="/purchase">
+                <Button className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 group text-sm sm:text-base">
+                  Buy Voting Code
+                  <ArrowRight className="ml-2 w-8 h-8 font-extrabold group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            )}
+            {!deadlinePassed && votable && (
+              <Link href="/vote">
+                <Button
+                  variant="outline"
+                  className="border-white/30 hover:bg-white/10 bg-transparent text-white text-sm sm:text-base"
+                >
+                  Vote Now
+                </Button>
+              </Link>
+            )}
+            {deadlinePassed && (
+              <Button disabled variant="outline" className="border-white/30 bg-transparent text-white/60 text-sm sm:text-base cursor-not-allowed">
+                Voting Closed
               </Button>
-            </Link>
-            <Link href="/vote">
-              <Button
-                variant="outline"
-                className="border-white/30 hover:bg-white/10 bg-transparent text-white text-sm sm:text-base"
-              >
-                Vote Now
-              </Button>
-            </Link>
+            )}
           </div>
         </div>
         {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="sm:hidden bg-black/20 backdrop-blur-lg">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              <Link href="/purchase">
-                <Button className="w-full justify-start bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 group text-sm sm:text-base">
-                  Buy Voting Code
-                  <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              {purchasable && (
+                <Link href="/purchase">
+                  <Button className="w-full justify-start bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 group text-sm sm:text-base">
+                    Buy Voting Code
+                    <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+              )}
+              {!deadlinePassed && votable && (
+                <Link href="/vote">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start border-white/30 hover:bg-white/10 bg-transparent text-white text-sm sm:text-base"
+                  >
+                    Vote Now
+                  </Button>
+                </Link>
+              )}
+              {deadlinePassed && (
+                <Button disabled variant="outline" className="w-full justify-start border-white/30 bg-transparent text-white/60 text-sm sm:text-base cursor-not-allowed">
+                  Voting Closed
                 </Button>
-              </Link>
-              <Link href="/vote">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start border-white/30 hover:bg-white/10 bg-transparent text-white text-sm sm:text-base"
-                >
-                  Vote Now
-                </Button>
-              </Link>
+              )}
             </div>
           </div>
         )}
@@ -298,7 +333,15 @@ export default function Home() {
             )}
 
             <br />
-            {votingLive ? (
+            {deadlinePassed ? (
+              <Button
+                size="lg"
+                disabled
+                className="bg-white/20 text-white font-bold p-10 text-2xl md:text-4xl cursor-not-allowed"
+              >
+                Voting Closed
+              </Button>
+            ) : votingLive ? (
               <Link href="/vote">
                 <Button
                   size="lg"
@@ -308,7 +351,7 @@ export default function Home() {
                   <ArrowRight className="ml-2 w-10 h-10 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-            ) : (
+            ) : purchasable ? (
               <Link href="/purchase">
                 <Button
                   size="lg"
@@ -318,6 +361,14 @@ export default function Home() {
                   <ArrowRight className="ml-2 w-10 h-10 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
+            ) : (
+              <Button
+                size="lg"
+                disabled
+                className="bg-white/20 text-white font-bold p-10 text-2xl md:text-4xl cursor-not-allowed"
+              >
+                Voting Opens Soon
+              </Button>
             )}
           </div>
         </div>
