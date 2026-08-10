@@ -115,10 +115,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ team
 const patchSchema = z.object({
   votingOpen: z.boolean().optional(),
   order: z.number().int().nonnegative().optional(),
+  // Bulk danger flag: set every poet in this team in/out of the Danger Zone at
+  // once (used when a whole stage's roster faces the audience vote).
+  dangerAll: z.boolean().optional(),
 })
 
-// Partial update that never touches participants/votes. Used to open/close a team
-// for voting (any number of teams may be open at once) or set its ordering.
+// Partial update that never touches names/votes. Used to open/close a team
+// for voting (any number of teams may be open at once), set its ordering, or
+// bulk-flag its poets for a danger stage.
 export async function PATCH(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
   const { teamId } = await params
 
@@ -139,6 +143,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
     const update: Record<string, unknown> = {}
     if (parsed.data.votingOpen !== undefined) update.votingOpen = parsed.data.votingOpen
     if (parsed.data.order !== undefined) update.order = parsed.data.order
+    if (parsed.data.dangerAll !== undefined) update["participants.$[].inDanger"] = parsed.data.dangerAll
 
     const updatedTeam = await TeamModel.findByIdAndUpdate(teamId, { $set: update }, { new: true })
 

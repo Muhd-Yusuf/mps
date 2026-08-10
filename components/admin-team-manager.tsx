@@ -105,6 +105,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
   const [togglingTeamId, setTogglingTeamId] = useState<string | null>(null)
   const [togglingDangerId, setTogglingDangerId] = useState<string | null>(null)
   const [movingParticipantId, setMovingParticipantId] = useState<string | null>(null)
+  const [bulkFlaggingTeamId, setBulkFlaggingTeamId] = useState<string | null>(null)
 
   const teamOptions = useMemo(() => teams ?? [], [teams])
 
@@ -606,6 +607,42 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
     }
   }
 
+  // New-stage setup: flag (or unflag) every poet in a team in one click, e.g.
+  // when the whole surviving roster faces the audience vote in the next stage.
+  const handleBulkDanger = async (team: Team, flagAll: boolean) => {
+    const message = flagAll
+      ? `Flag ALL ${team.participants?.length ?? 0} poets in ${team.name} as Danger Zone?`
+      : `Remove the Danger Zone flag from every poet in ${team.name}?`
+    if (!confirm(message)) return
+    try {
+      setBulkFlaggingTeamId(team.id)
+      const response = await fetch(`/api/teams/${team.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dangerAll: flagAll }),
+      })
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error?.error ?? "Unable to update flags")
+      }
+      toast({
+        title: flagAll ? "Whole team flagged" : "Flags cleared",
+        description: flagAll
+          ? `Every poet in ${team.name} is now in the Danger Zone vote.`
+          : `No poet in ${team.name} is flagged anymore.`,
+      })
+      await onRefresh?.()
+    } catch (error: any) {
+      toast({
+        title: "Failed to update flags",
+        description: error?.message ?? "Please try again later",
+        variant: "destructive",
+      })
+    } finally {
+      setBulkFlaggingTeamId(null)
+    }
+  }
+
   // Blind Audition flow: when a coach picks a poet, move them from the
   // "Contestants" pool into that coach's team. Votes and photo travel along.
   const handleMoveParticipant = async (fromTeam: Team, participant: Participant, toTeam: Team) => {
@@ -897,7 +934,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                     </CardDescription>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant={team.votingOpen ? "default" : "outline"}
                       size="sm"
@@ -912,6 +949,28 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                       )}
                       {team.votingOpen ? "Close Voting" : "Open Voting"}
                     </Button>
+                    {teamParticipants.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          handleBulkDanger(team, !teamParticipants.every((p) => p.inDanger))
+                        }
+                        disabled={bulkFlaggingTeamId === team.id}
+                        className={
+                          teamParticipants.every((p) => p.inDanger)
+                            ? "border-red-600/50 text-red-600 hover:bg-red-50 hover:border-red-600"
+                            : "border-border/40 hover:bg-muted"
+                        }
+                      >
+                        {bulkFlaggingTeamId === team.id ? (
+                          <Spinner size="sm" className="mr-2" />
+                        ) : (
+                          <Flame className="mr-2 h-4 w-4" />
+                        )}
+                        {teamParticipants.every((p) => p.inDanger) ? "Clear All Flags" : "Flag All Danger"}
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
