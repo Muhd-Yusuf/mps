@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Image from "next/image"
-import { Plus, UserPlus, Trash2, Edit2, Radio, Flame, ArrowRightLeft } from "lucide-react"
+import { Plus, UserPlus, Trash2, Edit2, Radio, Flame, ArrowRightLeft, Search } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 
 import type { Team, Participant } from "@/lib/types"
@@ -106,6 +106,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
   const [togglingDangerId, setTogglingDangerId] = useState<string | null>(null)
   const [movingParticipantId, setMovingParticipantId] = useState<string | null>(null)
   const [bulkFlaggingTeamId, setBulkFlaggingTeamId] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
 
   const teamOptions = useMemo(() => teams ?? [], [teams])
 
@@ -910,8 +911,47 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
           </Card>
         )}
 
+        {!isLoading && hasTeams && (
+          <Card className="border-border/40 bg-white backdrop-blur">
+            <CardContent className="pt-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search poets or teams by name…"
+                  className="pl-9"
+                />
+              </div>
+              {search.trim() && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {teamOptions.reduce(
+                    (sum, t) =>
+                      sum +
+                      (t.participants ?? []).filter((p) =>
+                        p.name.toLowerCase().includes(search.trim().toLowerCase())
+                      ).length,
+                    0
+                  )}{" "}
+                  poet(s) match &ldquo;{search.trim()}&rdquo;
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {teamOptions.map((team) => {
-          const teamParticipants = team.participants ?? []
+          const query = search.trim().toLowerCase()
+          const allParticipants = team.participants ?? []
+          const teamParticipants = query
+            ? allParticipants.filter((p) => p.name.toLowerCase().includes(query))
+            : allParticipants
+
+          // While searching, hide teams with no matching poets (unless the
+          // team name itself matches the query).
+          if (query && teamParticipants.length === 0 && !team.name.toLowerCase().includes(query)) {
+            return null
+          }
 
           return (
             <Card key={team.id} className="bg-white border-border/40">
@@ -949,16 +989,16 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                       )}
                       {team.votingOpen ? "Close Voting" : "Open Voting"}
                     </Button>
-                    {teamParticipants.length > 0 && (
+                    {allParticipants.length > 0 && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() =>
-                          handleBulkDanger(team, !teamParticipants.every((p) => p.inDanger))
+                          handleBulkDanger(team, !allParticipants.every((p) => p.inDanger))
                         }
                         disabled={bulkFlaggingTeamId === team.id}
                         className={
-                          teamParticipants.every((p) => p.inDanger)
+                          allParticipants.every((p) => p.inDanger)
                             ? "border-red-600/50 text-red-600 hover:bg-red-50 hover:border-red-600"
                             : "border-border/40 hover:bg-muted"
                         }
@@ -968,7 +1008,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                         ) : (
                           <Flame className="mr-2 h-4 w-4" />
                         )}
-                        {teamParticipants.every((p) => p.inDanger) ? "Clear All Flags" : "Flag All Danger"}
+                        {allParticipants.every((p) => p.inDanger) ? "Clear All Flags" : "Flag All Danger"}
                       </Button>
                     )}
                     <Button
