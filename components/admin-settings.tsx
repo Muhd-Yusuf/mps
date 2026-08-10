@@ -254,8 +254,9 @@ export default function AdminSettings() {
                     <CardDescription>
                         Pick the stage the competition is in right now. Each stage sets what voters see, which
                         poets are votable, and how results are counted in reports. For Danger Zone stages, when
-                        the voting deadline passes the top poets <strong>advance automatically</strong> — the rest
-                        are moved to the &ldquo;Eliminated&rdquo; team.
+                        the voting deadline passes the top poets are <strong>automatically moved to the
+                        &ldquo;Revived&rdquo; team</strong> and the rest to &ldquo;Eliminated&rdquo; — then Assign
+                        Team the revived poets onward.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

@@ -2,13 +2,15 @@ import { SettingModel, TeamModel } from "./mongodb"
 import { getPreset, presetFromMode } from "./stages"
 
 const ELIMINATED_TEAM = "Eliminated"
+const REVIVED_TEAM = "Revived"
 
 // Automatic stage finalization: once the voting deadline passes on a danger
-// stage, the top-N most-voted poets automatically advance (they simply stay in
-// their teams) and every other flagged poet is moved to the "Eliminated"
-// archive team. Runs lazily on the first request after the deadline — no cron
-// or online admin needed — and exactly once per round thanks to the atomic
-// settings marker.
+// stage, the top-N most-voted poets are moved to the "Revived" team and every
+// other flagged poet is moved to the "Eliminated" archive team — both outcomes
+// gathered in one place each, ready for the admin to Assign Team onward.
+// Runs lazily on the first request after the deadline — no cron or online
+// admin needed — and exactly once per round thanks to the atomic settings
+// marker.
 //
 // Team-voting stages (e.g. Quarter Final) are NOT auto-finalized: their open
 // team lists also contain judges' picks, which the audience result must not
@@ -68,28 +70,40 @@ export async function finalizeStageIfDue(): Promise<void> {
       eliminated = ranked.slice(advance)
     }
 
-    let elimTeam = await TeamModel.findOne({ name: ELIMINATED_TEAM })
-    if (!elimTeam) {
-      elimTeam = await TeamModel.create({
-        name: ELIMINATED_TEAM,
-        color: "#6B7280",
-        coach: { name: "—" },
-        votingOpen: false,
-        order: 9999,
-        participants: [],
-      })
+    const ensureTeam = async (name: string, color: string, order: number) => {
+      let team = await TeamModel.findOne({ name })
+      if (!team) {
+        team = await TeamModel.create({
+          name,
+          color,
+          coach: { name: "—" },
+          votingOpen: false,
+          order,
+          participants: [],
+        })
+      }
+      return team
     }
+    const [elimTeam, revivedTeam] = await Promise.all([
+      ensureTeam(ELIMINATED_TEAM, "#6B7280", 9999),
+      ensureTeam(REVIVED_TEAM, "#16A34A", 9998),
+    ])
 
-    // Copy into Eliminated first, then pull from the source — a crash between
-    // the two leaves a visible duplicate rather than a lost poet.
-    for (const { team, participant } of eliminated) {
-      const poet = participant.toObject ? participant.toObject() : participant
-      await TeamModel.updateOne(
-        { _id: elimTeam._id, "participants._id": { $ne: poet._id } },
-        { $push: { participants: { ...poet, updatedAt: new Date() } } }
-      )
-      await TeamModel.updateOne({ _id: team._id }, { $pull: { participants: { _id: poet._id } } })
+    // Copy into the destination first, then pull from the source — a crash
+    // between the two leaves a visible duplicate rather than a lost poet.
+    const moveTo = async (destId: any, moves: typeof flagged) => {
+      for (const { team, participant } of moves) {
+        if (team._id.equals(destId)) continue
+        const poet = participant.toObject ? participant.toObject() : participant
+        await TeamModel.updateOne(
+          { _id: destId, "participants._id": { $ne: poet._id } },
+          { $push: { participants: { ...poet, updatedAt: new Date() } } }
+        )
+        await TeamModel.updateOne({ _id: team._id }, { $pull: { participants: { _id: poet._id } } })
+      }
     }
+    await moveTo(elimTeam._id, eliminated)
+    await moveTo(revivedTeam._id, advanced)
 
     await SettingModel.updateOne(
       { key: markerKey },
