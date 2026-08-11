@@ -165,7 +165,15 @@ export async function POST(request: Request) {
       round,
     })
 
-    // Initialize Paystack payment
+    // Initialize Paystack payment. The post-payment redirect goes back to the
+    // SAME domain the buyer is on (derived from the request), so a wrong
+    // NEXT_PUBLIC_APP_URL can never strand buyers on a 404 after paying.
+    const forwardedHost = request.headers.get("x-forwarded-host")
+    const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https"
+    const origin = forwardedHost
+      ? `${forwardedProto}://${forwardedHost}`
+      : process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+
     const ticketId = ticket._id.toString()
     const paystackResponse: any = await makePaystackRequest("/transaction/initialize", {
       email: parsed.data.email,
@@ -175,7 +183,7 @@ export async function POST(request: Request) {
         ticketId,
         votingCode,
       },
-      callback_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/purchase/verify?reference=${ticketId}&ticketId=${ticketId}`,
+      callback_url: `${origin}/purchase/verify?reference=${ticketId}&ticketId=${ticketId}`,
     })
 
     // Update ticket with Paystack reference
