@@ -78,7 +78,10 @@ export const STAGE_PRESETS: StagePreset[] = [
     publicLabel: "Battle Round — Revival Vote",
     name: "Battle Round — Revival",
     mode: "danger",
-    dangerLayout: "flat",
+    // Battle poets already belong to coach teams, so the danger list shows
+    // them under their team banner (unlike the blind audition, where the
+    // whole point is that no coach picked them).
+    dangerLayout: "grouped",
     accentColor: DANGER_COLOR,
     heading: "Danger Zone",
     description:
