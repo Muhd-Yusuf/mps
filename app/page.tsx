@@ -333,6 +333,9 @@ export default function Home() {
             )}
 
             <br />
+            {/* THE one call-to-action for the whole page. Buying is always the
+                primary action while sales are open (Paystack); voting happens
+                via the nav's Vote Now. Closed state blocks everything. */}
             {deadlinePassed ? (
               <Button
                 size="lg"
@@ -341,26 +344,26 @@ export default function Home() {
               >
                 Voting Closed
               </Button>
-            ) : votingLive ? (
-              <Link href="/vote">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 group font-bold p-10 text-2xl md:text-4xl"
-                >
-                  Vote Now
-                  <ArrowRight className="ml-2 w-10 h-10 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
             ) : purchasable ? (
-              <Link href="/purchase">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 group font-bold p-10 text-2xl md:text-4xl"
-                >
-                  Buy Voting Code
-                  <ArrowRight className="ml-2 w-10 h-10 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
+              <div className="flex flex-col items-center gap-4">
+                <Link href="/purchase">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 group font-bold p-10 text-2xl md:text-4xl"
+                  >
+                    Buy Voting Code
+                    <ArrowRight className="ml-2 w-10 h-10 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+                {votingLive && (
+                  <Link
+                    href="/vote"
+                    className="text-white/90 underline underline-offset-4 text-base sm:text-lg hover:text-white transition-colors"
+                  >
+                    Already have a code? Vote now →
+                  </Link>
+                )}
+              </div>
             ) : (
               <Button
                 size="lg"
@@ -408,16 +411,10 @@ export default function Home() {
               </Card>
             ))}
 
-            {/* CTA card completes the grid */}
+            {/* Motto card completes the grid — the single CTA lives in the hero */}
             <Card className="bg-gradient-to-br from-primary to-accent border-0 flex flex-col justify-center">
               <CardContent className="py-8 text-center">
-                <p className="text-white font-bold text-lg mb-4">Your vote writes the story.</p>
-                <Link href="/purchase">
-                  <Button size="lg" variant="secondary" className="font-bold">
-                    Buy Voting Code
-                    <ArrowRight className="ml-2 w-5 h-5" />
-                  </Button>
-                </Link>
+                <p className="text-white font-bold text-xl">Your vote writes the story.</p>
               </CardContent>
             </Card>
           </div>
@@ -484,15 +481,13 @@ export default function Home() {
             ))}
           </div>
           <div className="text-center mt-10">
-            <Link href="/purchase">
-              <Button
-                size="lg"
-                className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 font-bold text-lg px-10"
-              >
-                Buy Voting Code
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-            </Link>
+            <button
+              type="button"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="text-primary font-semibold underline underline-offset-4 hover:opacity-80 transition-opacity"
+            >
+              Ready? Scroll up to get your voting code ↑
+            </button>
           </div>
         </div>
       </section>
