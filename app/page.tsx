@@ -355,12 +355,15 @@ export default function Home() {
                     <ArrowRight className="ml-2 w-10 h-10 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
-                {votingLive && (
-                  <Link
-                    href="/vote"
-                    className="text-white/90 underline underline-offset-4 text-base sm:text-lg hover:text-white transition-colors"
-                  >
-                    Already have a code? Vote now →
+                {votable && !startPending && (
+                  <Link href="/vote">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-white/50 hover:bg-white/10 bg-transparent text-white font-semibold text-lg sm:text-xl px-8 py-6"
+                    >
+                      Already have a code? Vote Now →
+                    </Button>
                   </Link>
                 )}
               </div>
