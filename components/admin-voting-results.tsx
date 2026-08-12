@@ -32,26 +32,36 @@ function RankedList({
   poets,
   preset,
   cutoff,
+  // Overall-slice stages rank across ALL teams: pass each poet's overall rank
+  // and qualification so the list can render per-team without lying.
+  rankOf,
+  qualifiedIds,
+  maxVotesOverride,
 }: {
   poets: RankedPoet[]
   preset: StagePreset
   cutoff: number
+  rankOf?: (poet: RankedPoet) => number
+  qualifiedIds?: Set<string>
+  maxVotesOverride?: number
 }) {
-  const maxVotes = poets.length ? Math.max(...poets.map((p) => p.votes ?? 0)) : 0
+  const maxVotes = maxVotesOverride ?? (poets.length ? Math.max(...poets.map((p) => p.votes ?? 0)) : 0)
 
   return (
     <div className="space-y-4">
       {poets.map((poet, index) => {
         const votes = poet.votes ?? 0
         const percentage = maxVotes > 0 ? (votes / maxVotes) * 100 : 0
-        const qualifies = cutoff > 0 && index < cutoff && votes > 0
+        const qualifies = qualifiedIds
+          ? qualifiedIds.has(poet.id)
+          : cutoff > 0 && index < cutoff && votes > 0
 
         return (
           <div key={poet.id}>
             <div className="flex items-center justify-between mb-2 gap-2">
               <div className="flex items-center gap-3 min-w-0">
                 <span className="text-xs font-bold text-muted-foreground w-5 text-right flex-shrink-0">
-                  {index + 1}
+                  {rankOf ? rankOf(poet) : index + 1}
                 </span>
                 <div className="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-border/40">
                   <Image src={poet.image || placeholderImage} alt={poet.name} fill className="object-cover" />
@@ -181,21 +191,60 @@ export default function AdminVotingResults({ teams, isLoading }: AdminVotingResu
       )
     }
 
+    // Overall slice, displayed per team: rank and qualification are computed
+    // across ALL flagged poets, then shown grouped under each team's card.
     const ranked = [...dangerPoets].sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0))
+    const rankMap = new Map(ranked.map((p, i) => [p.id, i + 1]))
+    const qualifiedIds = new Set(
+      ranked.slice(0, advance).filter((p) => (p.votes ?? 0) > 0).map((p) => p.id)
+    )
+    const overallMax = ranked.length ? Math.max(...ranked.map((p) => p.votes ?? 0)) : 0
+    const teamGroups = teams
+      .map((team) => ({
+        team,
+        poets: dangerPoets
+          .filter((p) => (team.participants ?? []).some((tp) => tp.id === p.id))
+          .sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0)),
+      }))
+      .filter((g) => g.poets.length > 0)
+
     return (
       <div className="space-y-6">
         {banner}
-        <Card className="bg-white border-border/40">
-          <CardHeader>
-            <CardTitle className="text-foreground">{preset.heading} Ranking</CardTitle>
-            <CardDescription>
-              Total votes: {ranked.reduce((sum, p) => sum + (p.votes ?? 0), 0)}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RankedList poets={ranked} preset={preset} cutoff={advance} />
-          </CardContent>
-        </Card>
+        {teamGroups.map(({ team, poets }) => (
+          <Card key={team.id} className="bg-white border-border/40">
+            <CardHeader>
+              <div className="flex items-center gap-4">
+                <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-border/40">
+                  <Image
+                    src={team.coach?.image || placeholderImage}
+                    alt={team.coach?.name ?? "Coach"}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: team.color }} />
+                <div>
+                  <CardTitle className="text-foreground">{team.name}</CardTitle>
+                  <CardDescription>
+                    {team.coach?.name ? `Coach: ${team.coach.name} • ` : ""}
+                    Team votes: {poets.reduce((sum, p) => sum + (p.votes ?? 0), 0)}
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <RankedList
+                poets={poets}
+                preset={preset}
+                cutoff={advance}
+                rankOf={(p) => rankMap.get(p.id) ?? 0}
+                qualifiedIds={qualifiedIds}
+                maxVotesOverride={overallMax}
+              />
+            </CardContent>
+          </Card>
+        ))}
       </div>
     )
   }
