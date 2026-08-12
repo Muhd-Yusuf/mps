@@ -94,7 +94,8 @@ export const STAGE_PRESETS: StagePreset[] = [
     publicLabel: "Knockout Stage — Audience Vote",
     name: "Knockout Stage — Audience Vote",
     mode: "danger",
-    dangerLayout: "flat",
+    // Knockout poets belong to coach teams — show them team by team.
+    dangerLayout: "grouped",
     accentColor: BRAND_COLOR,
     heading: "Audience Vote",
     description:
