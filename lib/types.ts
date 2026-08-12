@@ -12,6 +12,7 @@ export interface Participant {
   votes: number
   image?: string
   inDanger?: boolean
+  originTeam?: string
   createdAt?: string
   updatedAt?: string
 }

@@ -67,7 +67,9 @@ function RankedList({
                   <Image src={poet.image || placeholderImage} alt={poet.name} fill className="object-cover" />
                 </div>
                 <span className="font-medium text-foreground truncate">{poet.name}</span>
-                <span className="text-xs text-muted-foreground truncate hidden sm:inline">{poet.teamName}</span>
+                <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                  {poet.originTeam ? `from ${poet.originTeam}` : poet.teamName}
+                </span>
                 {qualifies && <AdvanceBadge preset={preset} />}
               </div>
               <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">{votes} votes</span>

@@ -1070,6 +1070,11 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {participant.originTeam && (
+                          <Badge variant="outline" className="text-muted-foreground border-border/60">
+                            from {participant.originTeam}
+                          </Badge>
+                        )}
                         {participant.inDanger && (
                           <Badge className="bg-red-600 text-white hover:bg-red-600">Danger Zone</Badge>
                         )}

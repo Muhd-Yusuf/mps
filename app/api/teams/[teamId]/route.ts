@@ -102,6 +102,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ team
           image: normalizeString(participant.image) ?? match.image,
           votes: match.votes ?? 0,
           inDanger: match.inDanger ?? false,
+          originTeam: match.originTeam,
           createdAt: match.createdAt,
           updatedAt: new Date(),
         }

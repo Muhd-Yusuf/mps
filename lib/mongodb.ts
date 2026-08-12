@@ -50,6 +50,9 @@ const participantSchema = new Schema(
     // Blind audition: poets not chosen by any coach land in the Danger Zone,
     // where the public votes on who stays in the competition.
     inDanger: { type: Boolean, default: false },
+    // The team a poet came from before being moved to Revived/Eliminated —
+    // carried across the whole admin so nobody loses track of where they belong.
+    originTeam: { type: String, trim: true },
   },
   { timestamps: true }
 )
