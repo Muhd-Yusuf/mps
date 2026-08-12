@@ -92,15 +92,53 @@ function RankedList({
   )
 }
 
+type HistoryRound = {
+  round: number | null
+  votes: number
+  stageName?: string
+  finalizedAt?: string
+  advanced?: string[]
+}
+type HistoryResult = { name: string; team: string; votes: number; advanced: boolean }
+
 export default function AdminVotingResults({ teams, isLoading }: AdminVotingResultsProps) {
   const [preset, setPreset] = useState<StagePreset>(getPreset(null))
+  const [currentRound, setCurrentRound] = useState<number | null>(null)
+  const [historyRounds, setHistoryRounds] = useState<HistoryRound[]>([])
+  const [selectedRound, setSelectedRound] = useState<"live" | number | "legacy">("live")
+  const [historyResults, setHistoryResults] = useState<HistoryResult[] | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   useEffect(() => {
     fetch("/api/settings/preset", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => data && setPreset(getPreset(data.preset)))
       .catch(() => {})
+    fetch("/api/settings/round", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data && setCurrentRound(data.round))
+      .catch(() => {})
+    fetch("/api/votes/history", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data && setHistoryRounds(data.rounds ?? []))
+      .catch(() => {})
   }, [])
+
+  const viewRound = async (round: number | "legacy") => {
+    setSelectedRound(round)
+    setHistoryLoading(true)
+    setHistoryResults(null)
+    try {
+      const res = await fetch(`/api/votes/history?round=${round}`, { cache: "no-store" })
+      if (res.ok) setHistoryResults((await res.json()).results ?? [])
+    } catch {
+      /* keep null -> error text below */
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const pastRounds = historyRounds.filter((r) => r.round !== currentRound)
 
   if (isLoading) {
     return (
@@ -119,6 +157,108 @@ export default function AdminVotingResults({ teams, isLoading }: AdminVotingResu
           No teams found. Create a team to start tracking votes.
         </CardContent>
       </Card>
+    )
+  }
+
+  // Stage-history selector: the vote records of every past round stay in the
+  // database, so any previous stage's results can be revisited at any time.
+  const roundSelector = pastRounds.length > 0 && (
+    <Card className="bg-white border-border/40">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base text-foreground">Stage Results</CardTitle>
+        <CardDescription>View the live stage or revisit a previous one.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedRound("live")}
+            className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+              selectedRound === "live"
+                ? "border-transparent bg-gradient-to-r from-primary to-accent text-white"
+                : "border-border/50 text-foreground hover:bg-muted"
+            }`}
+          >
+            Live — current stage
+          </button>
+          {pastRounds.map((r) => (
+            <button
+              key={String(r.round)}
+              type="button"
+              onClick={() => viewRound(r.round ?? "legacy")}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                selectedRound === (r.round ?? "legacy")
+                  ? "border-transparent bg-gradient-to-r from-primary to-accent text-white"
+                  : "border-border/50 text-foreground hover:bg-muted"
+              }`}
+            >
+              {r.round == null ? "Blind Audition (early)" : `Round ${r.round}`}
+              {r.stageName ? ` — ${r.stageName}` : ""} · {r.votes} votes
+            </button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  if (selectedRound !== "live") {
+    const meta = historyRounds.find((r) => (r.round ?? "legacy") === selectedRound)
+    const maxVotes = historyResults?.length ? Math.max(...historyResults.map((r) => r.votes)) : 0
+    return (
+      <div className="space-y-6">
+        {roundSelector}
+        <Card className="bg-white border-border/40">
+          <CardHeader>
+            <CardTitle className="text-foreground">
+              {selectedRound === "legacy" ? "Blind Audition (early votes)" : `Round ${selectedRound}`}
+              {meta?.stageName ? ` — ${meta.stageName}` : ""}
+            </CardTitle>
+            <CardDescription>
+              {meta?.votes ?? 0} votes{meta?.finalizedAt ? ` · finalized ${new Date(meta.finalizedAt).toLocaleString()}` : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {historyLoading && <p className="text-sm text-muted-foreground py-4">Loading…</p>}
+            {!historyLoading && !historyResults && (
+              <p className="text-sm text-destructive py-4">Could not load this round — try again.</p>
+            )}
+            {!historyLoading && historyResults && (
+              <div className="space-y-4">
+                {historyResults.map((r, index) => (
+                  <div key={`${r.name}-${index}`}>
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xs font-bold text-muted-foreground w-5 text-right flex-shrink-0">
+                          {index + 1}
+                        </span>
+                        <span className="font-medium text-foreground truncate">{r.name}</span>
+                        <span className="text-xs text-muted-foreground truncate hidden sm:inline">{r.team}</span>
+                        {r.advanced && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white whitespace-nowrap bg-green-600">
+                            ADVANCED
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">
+                        {r.votes} votes
+                      </span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary to-accent transition-all"
+                        style={{ width: `${maxVotes ? (r.votes / maxVotes) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+                {historyResults.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-4">No votes recorded in this round.</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
@@ -152,6 +292,7 @@ export default function AdminVotingResults({ teams, isLoading }: AdminVotingResu
     if (!dangerPoets.length) {
       return (
         <div className="space-y-6">
+          {roundSelector}
           {banner}
           <Card className="border-dashed border-border/50 bg-white backdrop-blur">
             <CardContent className="py-10 text-center text-muted-foreground">
@@ -175,6 +316,7 @@ export default function AdminVotingResults({ teams, isLoading }: AdminVotingResu
 
       return (
         <div className="space-y-6">
+          {roundSelector}
           {banner}
           {groups.map(({ team, poets }) => (
             <Card key={team.id} className="bg-white border-border/40">
@@ -212,6 +354,7 @@ export default function AdminVotingResults({ teams, isLoading }: AdminVotingResu
 
     return (
       <div className="space-y-6">
+        {roundSelector}
         {banner}
         {teamGroups.map(({ team, poets }) => (
           <Card key={team.id} className="bg-white border-border/40">
@@ -256,6 +399,7 @@ export default function AdminVotingResults({ teams, isLoading }: AdminVotingResu
 
   return (
     <div className="space-y-6">
+      {roundSelector}
       {perTeamCutoff > 0 && (
         <Card
           className="border-2"
