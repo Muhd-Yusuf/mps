@@ -90,7 +90,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
       phone: "",
       image: "",
     },
-    participants: [] as ParticipantDraft[],
+    participants: [] as (ParticipantDraft & { id?: string })[],
   })
   const [isEditingTeam, setIsEditingTeam] = useState(false)
   const [isUploadingEditCoachImage, setIsUploadingEditCoachImage] = useState(false)
@@ -399,6 +399,8 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
         image: team.coach?.image ?? "",
       },
       participants: (team.participants || []).map((p) => ({
+        // Carry the id so the server keeps votes/flags even when the poet is renamed.
+        id: p.id,
         name: p.name,
         image: p.image ?? "",
       })),
@@ -501,6 +503,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
       const participantsPayload = editTeamForm.participants
         .filter((participant) => participant.name.trim().length)
         .map((participant) => ({
+          id: (participant as any).id,
           name: participant.name.trim(),
           image: participant.image?.trim(),
         }))
@@ -1067,6 +1070,11 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {participant.originTeam && (
+                          <Badge variant="outline" className="text-muted-foreground border-border/60">
+                            from {participant.originTeam}
+                          </Badge>
+                        )}
                         {participant.inDanger && (
                           <Badge className="bg-red-600 text-white hover:bg-red-600">Danger Zone</Badge>
                         )}

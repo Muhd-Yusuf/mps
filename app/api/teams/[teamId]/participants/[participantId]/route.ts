@@ -56,9 +56,15 @@ export async function PATCH(
       // Copy into the destination first, then remove from the source — a crash
       // between the two leaves a visible duplicate rather than a lost poet.
       const poet = participant.toObject ? participant.toObject() : participant
+      // Moving INTO Revived/Eliminated records where the poet came from;
+      // moving into a real team clears it (they belong somewhere again).
+      const archives = ["Revived", "Eliminated"]
+      const originTeam = archives.includes(targetTeam.name)
+        ? poet.originTeam || (archives.includes(sourceTeam.name) ? "" : sourceTeam.name)
+        : ""
       await TeamModel.updateOne(
         { _id: targetTeam._id, "participants._id": { $ne: poet._id } },
-        { $push: { participants: { ...poet, updatedAt: new Date() } } }
+        { $push: { participants: { ...poet, originTeam, updatedAt: new Date() } } }
       )
       await TeamModel.updateOne(
         { _id: sourceTeam._id },
