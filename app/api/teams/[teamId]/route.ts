@@ -16,6 +16,8 @@ const coachSchema = z.object({
 })
 
 const participantSchema = z.object({
+  // Existing poets carry their id so edits (even renames) keep votes/flags.
+  id: z.string().optional(),
   name: z.string().min(1, "Participant name is required"),
   image: z.string().url("Participant image must be a valid URL").optional().or(z.literal("")),
   votes: z.number().int().nonnegative().optional().default(0),
@@ -77,11 +79,40 @@ export async function PUT(request: Request, { params }: { params: Promise<{ team
 
     await connectToDatabase()
 
-    const participants = (parsed.data.participants || []).map((participant) => ({
-      name: participant.name.trim(),
-      image: normalizeString(participant.image),
-      votes: participant.votes ?? 0,
-    }))
+    // MERGE with the existing roster instead of replacing it: matched poets
+    // (by id, else by name) keep their _id, votes, danger flag and history —
+    // editing a team or renaming a poet must never wipe votes.
+    const existingTeam = await TeamModel.findById(teamId)
+    if (!existingTeam) {
+      return NextResponse.json({ error: "Team not found" }, { status: 404 })
+    }
+    const existing = existingTeam.participants ?? []
+    const claimed = new Set<string>()
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ")
+    const participants = (parsed.data.participants || []).map((participant) => {
+      const match =
+        (participant.id &&
+          existing.find((e: any) => e._id.toString() === participant.id && !claimed.has(e._id.toString()))) ||
+        existing.find((e: any) => norm(e.name) === norm(participant.name) && !claimed.has(e._id.toString()))
+      if (match) {
+        claimed.add(match._id.toString())
+        return {
+          _id: match._id,
+          name: participant.name.trim(),
+          image: normalizeString(participant.image) ?? match.image,
+          votes: match.votes ?? 0,
+          inDanger: match.inDanger ?? false,
+          createdAt: match.createdAt,
+          updatedAt: new Date(),
+        }
+      }
+      return {
+        name: participant.name.trim(),
+        image: normalizeString(participant.image),
+        votes: 0,
+        inDanger: false,
+      }
+    })
     const coach = {
       name: parsed.data.coach.name.trim(),
       email: normalizeString(parsed.data.coach.email),
