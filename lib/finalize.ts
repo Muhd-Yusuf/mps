@@ -95,9 +95,12 @@ export async function finalizeStageIfDue(): Promise<void> {
       for (const { team, participant } of moves) {
         if (team._id.equals(destId)) continue
         const poet = participant.toObject ? participant.toObject() : participant
+        // Remember where the poet came from so the admin never loses track.
+        const originTeam =
+          poet.originTeam || ([ELIMINATED_TEAM, REVIVED_TEAM].includes(team.name) ? "" : team.name)
         await TeamModel.updateOne(
           { _id: destId, "participants._id": { $ne: poet._id } },
-          { $push: { participants: { ...poet, updatedAt: new Date() } } }
+          { $push: { participants: { ...poet, originTeam, updatedAt: new Date() } } }
         )
         await TeamModel.updateOne({ _id: team._id }, { $pull: { participants: { _id: poet._id } } })
       }
