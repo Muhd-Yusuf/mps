@@ -70,7 +70,13 @@ export default function AdminPage() {
     try {
       setIsLoadingTeams(true)
       setTeamsError(null)
-      const response = await fetch("/api/teams", { cache: "no-store" })
+      // One automatic retry: serverless cold starts occasionally time out the
+      // first request — don't surface an error for a self-healing blip.
+      let response = await fetch("/api/teams", { cache: "no-store" }).catch(() => null)
+      if (!response || !response.ok) {
+        await new Promise((r) => setTimeout(r, 1500))
+        response = await fetch("/api/teams", { cache: "no-store" })
+      }
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
         throw new Error(error?.error ?? "Unable to fetch teams")
