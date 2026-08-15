@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server"
 
 import { uploadImageToCloudinary } from "@/lib/cloudinary"
+import { requireAdmin } from "@/lib/auth"
 
 export async function POST(request: Request) {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   try {
     const formData = await request.formData()
     const file = formData.get("file")

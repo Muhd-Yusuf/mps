@@ -1,4 +1,5 @@
 import type { AuthOptions } from "next-auth"
+import { getServerSession } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 
 export const authOptions: AuthOptions = {
@@ -31,4 +32,10 @@ export const authOptions: AuthOptions = {
         strategy: "jwt",
     },
     secret: process.env.NEXTAUTH_SECRET,
+}
+
+// Server-side admin gate for mutation/sensitive endpoints. Returns the session
+// or null; callers reject with 401 when null.
+export async function requireAdmin() {
+    return getServerSession(authOptions)
 }

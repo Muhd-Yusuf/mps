@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 
 import { connectToDatabase, SettingModel } from "@/lib/mongodb"
+import { requireAdmin } from "@/lib/auth"
 
 const LABEL_KEY = "team_label"
 const DEFAULT_LABEL = "Team"
@@ -22,6 +23,10 @@ const labelSchema = z.object({
 })
 
 export async function POST(request: Request) {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   try {
     const payload = await request.json()
     const parsed = labelSchema.safeParse(payload)

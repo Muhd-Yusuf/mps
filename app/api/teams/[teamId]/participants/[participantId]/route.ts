@@ -3,6 +3,7 @@ import { isValidObjectId, Types } from "mongoose"
 import { z } from "zod"
 
 import { connectToDatabase, TeamModel } from "@/lib/mongodb"
+import { requireAdmin } from "@/lib/auth"
 
 const patchSchema = z.object({
   inDanger: z.boolean().optional(),
@@ -15,6 +16,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ teamId: string; participantId: string }> }
 ) {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   const { teamId, participantId } = await params
 
   if (!isValidObjectId(teamId) || !isValidObjectId(participantId)) {
