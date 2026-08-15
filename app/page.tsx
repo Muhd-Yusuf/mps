@@ -84,9 +84,9 @@ export default function Home() {
   const startPending = votingStart ? now < votingStart.getTime() : false
   const deadlinePassed = votingDeadline ? now > votingDeadline.getTime() : false
   const votingLive = !startPending && !deadlinePassed && votable && (votingStart || votingDeadline)
-  // Codes are sellable before/while voting runs, never after it closes and
-  // never when nothing is set up to vote on.
-  const purchasable = !deadlinePassed && (votable || startPending)
+  // Code sales mirror the voting window exactly: nothing sellable before the
+  // scheduled start, after the close, or when nothing is set up to vote on.
+  const purchasable = !deadlinePassed && !startPending && votable
 
   useEffect(() => {
     const init = async () => {
@@ -302,7 +302,7 @@ export default function Home() {
                   })()}
                 </div>
                 <p className="text-white/70 text-sm sm:text-base mt-4">
-                  Get your voting code ready before voting opens.
+                  Code sales and voting open when the countdown ends.
                 </p>
               </div>
             )}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { connectToDatabase, TicketModel } from "@/lib/mongodb"
+import { requireAdmin } from "@/lib/auth"
 
 function serializeTicket(ticket: any) {
   return {
@@ -16,6 +17,10 @@ function serializeTicket(ticket: any) {
 }
 
 export async function GET() {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   try {
     await connectToDatabase()
     const tickets = await TicketModel.find({ isPaid: true }).sort({ createdAt: -1 }).lean()

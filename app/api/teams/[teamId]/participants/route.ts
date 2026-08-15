@@ -3,6 +3,7 @@ import { isValidObjectId, Types } from "mongoose"
 import { z } from "zod"
 
 import { connectToDatabase, TeamModel } from "@/lib/mongodb"
+import { requireAdmin } from "@/lib/auth"
 
 const participantSchema = z.object({
   name: z.string().min(1, "Participant name is required"),
@@ -46,6 +47,10 @@ function serializeTeam(team: any) {
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   const { teamId } = await params
 
   if (!teamId) {
