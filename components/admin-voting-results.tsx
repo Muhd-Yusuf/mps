@@ -37,6 +37,7 @@ function RankedList({
   rankOf,
   qualifiedIds,
   maxVotesOverride,
+  hideTeamLabel,
 }: {
   poets: RankedPoet[]
   preset: StagePreset
@@ -44,6 +45,7 @@ function RankedList({
   rankOf?: (poet: RankedPoet) => number
   qualifiedIds?: Set<string>
   maxVotesOverride?: number
+  hideTeamLabel?: boolean
 }) {
   const maxVotes = maxVotesOverride ?? (poets.length ? Math.max(...poets.map((p) => p.votes ?? 0)) : 0)
 
@@ -67,9 +69,11 @@ function RankedList({
                   <Image src={poet.image || placeholderImage} alt={poet.name} fill className="object-cover" />
                 </div>
                 <span className="font-medium text-foreground truncate">{poet.name}</span>
-                <span className="text-xs text-muted-foreground truncate hidden sm:inline">
-                  {poet.originTeam ? `from ${poet.originTeam}` : poet.teamName}
-                </span>
+                {!hideTeamLabel && (
+                  <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                    {poet.originTeam ? `from ${poet.originTeam}` : poet.teamName}
+                  </span>
+                )}
                 {qualifies && <AdvanceBadge preset={preset} />}
               </div>
               <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">{votes} votes</span>
@@ -265,12 +269,25 @@ export default function AdminVotingResults({ teams, isLoading }: AdminVotingResu
   const { slice, advance } = preset.results
   const isDanger = preset.mode === "danger"
 
-  // Danger stages: only flagged poets are votable, so results rank them alone.
+  // Danger stages: only flagged poets are votable. Group results by each poet's
+  // HOME team (their origin team when they've been moved to Revived/Eliminated
+  // by finalization, else their current team) so results ALWAYS read as Team A,
+  // B, C… cards — never as one flat list, and never lumped under "Revived".
   if (isDanger) {
-    const dangerPoets: RankedPoet[] = teams.flatMap((team) =>
+    const ARCHIVE_NAMES = ["Revived", "Eliminated"]
+    // Coach lookup by team name, for the card header photo/coach.
+    const teamMeta = new Map(teams.map((t) => [t.name, t]))
+
+    type HomePoet = RankedPoet & { homeTeam: string }
+    const dangerPoets: HomePoet[] = teams.flatMap((team) =>
       (team.participants ?? [])
         .filter((p) => p.inDanger)
-        .map((p) => ({ ...p, teamName: team.name }))
+        .map((p) => ({
+          ...p,
+          teamName: team.name,
+          // origin wins when the poet sits in an archive team
+          homeTeam: p.originTeam || (ARCHIVE_NAMES.includes(team.name) ? "Unassigned" : team.name),
+        }))
     )
 
     const banner = (
@@ -303,90 +320,67 @@ export default function AdminVotingResults({ teams, isLoading }: AdminVotingResu
       )
     }
 
-    if (slice === "perTeam") {
-      // Semi Final: rank within each team, top N per team qualify.
-      const groups = teams
-        .map((team) => ({
-          team,
-          poets: dangerPoets
-            .filter((p) => (team.participants ?? []).some((tp) => tp.id === p.id))
-            .sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0)),
-        }))
-        .filter((g) => g.poets.length > 0)
-
-      return (
-        <div className="space-y-6">
-          {roundSelector}
-          {banner}
-          {groups.map(({ team, poets }) => (
-            <Card key={team.id} className="bg-white border-border/40">
-              <CardHeader>
-                <CardTitle className="text-foreground">{team.name}</CardTitle>
-                <CardDescription>
-                  Total votes: {poets.reduce((sum, p) => sum + (p.votes ?? 0), 0)}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <RankedList poets={poets} preset={preset} cutoff={advance} />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )
-    }
-
-    // Overall slice, displayed per team: rank and qualification are computed
-    // across ALL flagged poets, then shown grouped under each team's card.
-    const ranked = [...dangerPoets].sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0))
-    const rankMap = new Map(ranked.map((p, i) => [p.id, i + 1]))
-    const qualifiedIds = new Set(
-      ranked.slice(0, advance).filter((p) => (p.votes ?? 0) > 0).map((p) => p.id)
+    // Group by home team, in natural team order.
+    const homeNames = [...new Set(dangerPoets.map((p) => p.homeTeam))].sort()
+    const overallRanked = [...dangerPoets].sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0))
+    const overallRankMap = new Map(overallRanked.map((p, i) => [p.id, i + 1]))
+    const overallQualified = new Set(
+      overallRanked.slice(0, advance).filter((p) => (p.votes ?? 0) > 0).map((p) => p.id)
     )
-    const overallMax = ranked.length ? Math.max(...ranked.map((p) => p.votes ?? 0)) : 0
-    const teamGroups = teams
-      .map((team) => ({
-        team,
+    const overallMax = overallRanked.length ? Math.max(...overallRanked.map((p) => p.votes ?? 0)) : 0
+
+    const groups = homeNames
+      .map((name) => ({
+        name,
+        meta: teamMeta.get(name),
         poets: dangerPoets
-          .filter((p) => (team.participants ?? []).some((tp) => tp.id === p.id))
+          .filter((p) => p.homeTeam === name)
           .sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0)),
       }))
       .filter((g) => g.poets.length > 0)
 
+    // perTeam: top N WITHIN each team qualify (ranks restart at 1 per card).
+    // overall: rank and cut-off computed across all teams, shown per card.
     return (
       <div className="space-y-6">
         {roundSelector}
         {banner}
-        {teamGroups.map(({ team, poets }) => (
-          <Card key={team.id} className="bg-white border-border/40">
+        {groups.map(({ name, meta, poets }) => (
+          <Card key={name} className="bg-white border-border/40">
             <CardHeader>
               <div className="flex items-center gap-4">
                 <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-border/40">
                   <Image
-                    src={team.coach?.image || placeholderImage}
-                    alt={team.coach?.name ?? "Coach"}
+                    src={meta?.coach?.image || placeholderImage}
+                    alt={meta?.coach?.name ?? "Coach"}
                     fill
                     className="object-cover"
                   />
                 </div>
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: team.color }} />
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: meta?.color ?? preset.accentColor }} />
                 <div>
-                  <CardTitle className="text-foreground">{team.name}</CardTitle>
+                  <CardTitle className="text-foreground">{name}</CardTitle>
                   <CardDescription>
-                    {team.coach?.name ? `Coach: ${team.coach.name} • ` : ""}
+                    {meta?.coach?.name ? `Coach: ${meta.coach.name} • ` : ""}
                     Team votes: {poets.reduce((sum, p) => sum + (p.votes ?? 0), 0)}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <RankedList
-                poets={poets}
-                preset={preset}
-                cutoff={advance}
-                rankOf={(p) => rankMap.get(p.id) ?? 0}
-                qualifiedIds={qualifiedIds}
-                maxVotesOverride={overallMax}
-              />
+              {slice === "perTeam" ? (
+                <RankedList poets={poets} preset={preset} cutoff={advance} hideTeamLabel />
+              ) : (
+                <RankedList
+                  poets={poets}
+                  preset={preset}
+                  cutoff={advance}
+                  rankOf={(p) => overallRankMap.get(p.id) ?? 0}
+                  qualifiedIds={overallQualified}
+                  maxVotesOverride={overallMax}
+                  hideTeamLabel
+                />
+              )}
             </CardContent>
           </Card>
         ))}
