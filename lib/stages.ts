@@ -101,7 +101,8 @@ export const STAGE_PRESETS: StagePreset[] = [
     description:
       "The judges have made their picks — now it's your turn. Vote for the poet you want to send to the Arewa Regional Finals in Abuja.",
     adminPrep: "Flag the poets still in contention for the audience slots as Danger Zone.",
-    results: { slice: "overall", advance: 4, advanceLabel: "ADVANCES" },
+    // Per the client: each team advances its own top 3 by audience vote.
+    results: { slice: "perTeam", advance: 3, advanceLabel: "ADVANCES" },
   },
   {
     key: "quarter_final",
