@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
-import { Save, RotateCw, Tag, Flame, CheckCircle2, Clock, XCircle } from "lucide-react"
+import { Save, RotateCw, Tag, Flame, CheckCircle2, Clock, XCircle, Lock } from "lucide-react"
 
 import { STAGE_PRESETS, getPreset } from "@/lib/stages"
 
@@ -42,6 +42,10 @@ export default function AdminSettings() {
     const [isAdvancing, setIsAdvancing] = useState(false)
     const [isSavingPreset, setIsSavingPreset] = useState(false)
     const [isSavingDeadline, setIsSavingDeadline] = useState(false)
+    const [currentPassword, setCurrentPassword] = useState("")
+    const [newPassword, setNewPassword] = useState("")
+    const [confirmPassword, setConfirmPassword] = useState("")
+    const [isChangingPassword, setIsChangingPassword] = useState(false)
 
     useEffect(() => {
         fetchSettings()
@@ -165,6 +169,41 @@ export default function AdminSettings() {
         }
     }
 
+    const handleChangePassword = async () => {
+        if (!currentPassword || !newPassword) {
+            toast.error("Fill in your current and new password")
+            return
+        }
+        if (newPassword.length < 8) {
+            toast.error("New password must be at least 8 characters")
+            return
+        }
+        if (newPassword !== confirmPassword) {
+            toast.error("New password and confirmation don't match")
+            return
+        }
+        try {
+            setIsChangingPassword(true)
+            const response = await fetch("/api/admin/password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ currentPassword, newPassword }),
+            })
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || "Failed to change password")
+            }
+            setCurrentPassword("")
+            setNewPassword("")
+            setConfirmPassword("")
+            toast.success("Admin password changed. Use the new password next time you log in.")
+        } catch (error: any) {
+            toast.error(error.message || "Error changing password")
+        } finally {
+            setIsChangingPassword(false)
+        }
+    }
+
     const handleSaveLabel = async () => {
         try {
             setIsSavingLabel(true)
@@ -245,6 +284,50 @@ export default function AdminSettings() {
 
     return (
         <div className="space-y-6">
+            <Card className="bg-white border-border/40 backdrop-blur shadow-sm">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Lock className="w-5 h-5 text-primary" />
+                        <CardTitle>Admin Password</CardTitle>
+                    </div>
+                    <CardDescription>
+                        Change the password used to log into this dashboard. Do this now if you haven&apos;t
+                        since setup — use at least 8 characters. The new password takes effect on your next login.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 max-w-sm">
+                    <Input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Current password"
+                        autoComplete="current-password"
+                    />
+                    <Input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="New password (min 8 characters)"
+                        autoComplete="new-password"
+                    />
+                    <Input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                        autoComplete="new-password"
+                    />
+                    <Button
+                        onClick={handleChangePassword}
+                        disabled={isChangingPassword}
+                        className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20"
+                    >
+                        {isChangingPassword ? <Spinner size="sm" className="mr-2" /> : <Lock className="w-4 h-4 mr-2" />}
+                        Change Password
+                    </Button>
+                </CardContent>
+            </Card>
+
             <Card className="bg-white border-border/40 backdrop-blur shadow-sm">
                 <CardHeader>
                     <div className="flex items-center gap-2">
