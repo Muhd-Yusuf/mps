@@ -3,6 +3,7 @@ import { z } from "zod"
 
 import { connectToDatabase, SettingModel } from "@/lib/mongodb"
 import { STAGE_PRESETS, getPreset, presetFromMode } from "@/lib/stages"
+import { requireAdmin } from "@/lib/auth"
 
 const PRESET_KEY = "stage_preset"
 const MODE_KEY = "voting_mode"
@@ -30,6 +31,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   try {
     const payload = await request.json()
     const parsed = presetSchema.safeParse(payload)

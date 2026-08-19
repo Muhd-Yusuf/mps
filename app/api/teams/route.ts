@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth"
 import { connectToDatabase, TeamModel } from "@/lib/mongodb"
 import { authOptions } from "@/lib/auth"
 import { finalizeStageIfDue } from "@/lib/finalize"
+import { requireAdmin } from "@/lib/auth"
 
 const coachSchema = z.object({
   name: z.string().min(1, "Coach name is required"),
@@ -79,6 +80,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   try {
     const payload = await request.json()
     const parsed = teamSchema.safeParse(payload)

@@ -18,6 +18,7 @@ import AdminStageManager from "@/components/admin-stage-manager"
 import AdminRevenue from "@/components/admin-revenue"
 import AdminSettings from "@/components/admin-settings"
 import AdminReport from "@/components/admin-report"
+import AdminVoterLog from "@/components/admin-voter-log"
 
 const statsIcons = ["📊", "👥", "🎤", "📈"] as const
 
@@ -286,7 +287,7 @@ export default function AdminPage() {
 
         <Tabs defaultValue="results" className="space-y-6 w-full">
           <div className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 h-auto">
               <TabsTrigger value="results" className="data-[state=active]:bg-primary/20">
                 Voting Results
               </TabsTrigger>
@@ -295,6 +296,9 @@ export default function AdminPage() {
               </TabsTrigger>
               <TabsTrigger value="teams" className="data-[state=active]:bg-primary/20">
                 Teams & Poets
+              </TabsTrigger>
+              <TabsTrigger value="voters" className="data-[state=active]:bg-primary/20">
+                Voter Log
               </TabsTrigger>
               <TabsTrigger value="revenue" className="data-[state=active]:bg-primary/20">
                 Revenue
@@ -316,6 +320,9 @@ export default function AdminPage() {
 
           <TabsContent value="teams" className="animate-fade-in-up">
             <AdminTeamManager teams={teams} isLoading={isLoadingTeams} onRefresh={fetchTeams} />
+          </TabsContent>
+          <TabsContent value="voters" className="animate-fade-in-up">
+            <AdminVoterLog />
           </TabsContent>
           <TabsContent value="revenue" className="animate-fade-in-up">
             <AdminRevenue />

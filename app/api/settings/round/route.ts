@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 
 import { connectToDatabase, SettingModel, TeamModel } from "@/lib/mongodb"
+import { requireAdmin } from "@/lib/auth"
 
 const ROUND_KEY = "current_round"
 const ROUND_LABEL_KEY = "round_label"
@@ -37,6 +38,10 @@ const roundSchema = z.object({
 })
 
 export async function POST(request: Request) {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   try {
     const payload = await request.json().catch(() => ({}))
     const parsed = roundSchema.safeParse(payload)

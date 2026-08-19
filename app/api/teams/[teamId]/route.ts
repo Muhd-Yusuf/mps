@@ -3,6 +3,7 @@ import { z } from "zod"
 import mongoose from "mongoose"
 
 import { connectToDatabase, TeamModel } from "@/lib/mongodb"
+import { requireAdmin } from "@/lib/auth"
 
 const coachSchema = z.object({
   name: z.string().min(1, "Coach name is required"),
@@ -59,6 +60,10 @@ function serializeTeam(team: any) {
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   const { teamId } = await params
 
   if (!teamId) {
@@ -156,6 +161,10 @@ const patchSchema = z.object({
 // for voting (any number of teams may be open at once), set its ordering, or
 // bulk-flag its poets for a danger stage.
 export async function PATCH(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   const { teamId } = await params
 
   if (!teamId || !mongoose.Types.ObjectId.isValid(teamId)) {
@@ -191,6 +200,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
+  const session = await requireAdmin()
+  if (!session) {
+    return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+  }
   const { teamId } = await params
 
   if (!teamId) {

@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Mail, Send } from "lucide-react"
+import { ChevronLeft, ChevronRight, Mail, Send, FileText } from "lucide-react"
 import { toast } from "sonner"
 import type { Ticket } from "@/lib/types"
 import { format } from "date-fns"
@@ -22,6 +22,7 @@ export default function AdminRevenue() {
   const [filter, setFilter] = useState<Filter>("all")
   const [resendingId, setResendingId] = useState<string | null>(null)
   const [isBulkResending, setIsBulkResending] = useState(false)
+  const [busyPdf, setBusyPdf] = useState(false)
   const itemsPerPage = 10
 
   useEffect(() => {
@@ -102,6 +103,54 @@ export default function AdminRevenue() {
   const safePage = Math.min(currentPage, totalPages)
   const currentTickets = filtered.slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage)
 
+  const filterTitle = filter === "unvoted" ? "Bought but Did Not Vote" : filter === "voted" ? "Voted" : "All Buyers"
+
+  const downloadPdf = async () => {
+    try {
+      setBusyPdf(true)
+      const { default: jsPDF } = await import("jspdf")
+      const { default: autoTable } = await import("jspdf-autotable")
+      const doc = new jsPDF()
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const drawHeader = (pageNumber: number) => {
+        doc.setFillColor(102, 126, 234)
+        doc.rect(0, 0, pageWidth, 24, "F")
+        doc.setTextColor(255, 255, 255)
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(14)
+        doc.text("MPS Media Poetry Challenge", 14, 11)
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(9)
+        doc.text(`${filterTitle} — ${filtered.length} buyers`, 14, 18)
+        doc.setFontSize(8)
+        doc.text(`Page ${pageNumber}`, pageWidth - 14, 12, { align: "right" })
+        doc.setTextColor(0, 0, 0)
+      }
+      autoTable(doc, {
+        startY: 30,
+        margin: { top: 28 },
+        head: [["Email", "Voting Code", "Amount", "Voted?", "Purchased"]],
+        body: filtered.map((t) => [
+          t.email,
+          t.votingCode,
+          naira(t.amount),
+          t.hasVoted ? "Yes" : "No",
+          format(new Date(t.createdAt), "PPP p"),
+        ]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [118, 75, 162] },
+        theme: "striped",
+        didDrawPage: (d: any) => drawHeader(d.pageNumber),
+      })
+      doc.save(`mps-${filter === "unvoted" ? "non-voters" : filter}-${new Date().toISOString().slice(0, 10)}.pdf`)
+      toast.success(`Exported ${filtered.length} buyers as PDF`)
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to build PDF")
+    } finally {
+      setBusyPdf(false)
+    }
+  }
+
   const setFilterAndReset = (f: Filter) => {
     setFilter(f)
     setCurrentPage(1)
@@ -164,15 +213,26 @@ export default function AdminRevenue() {
               </Button>
             ))}
           </div>
-          <Button
-            onClick={handleBulkResend}
-            disabled={isBulkResending || unvoted.length === 0}
-            variant="outline"
-            className="border-border/40 hover:bg-muted"
-          >
-            {isBulkResending ? <Spinner size="sm" className="mr-2" /> : <Send className="mr-2 h-4 w-4" />}
-            Re-send code to all {unvoted.length} non-voters
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={downloadPdf}
+              disabled={busyPdf || filtered.length === 0}
+              variant="outline"
+              className="border-border/40 hover:bg-muted"
+            >
+              {busyPdf ? <Spinner size="sm" className="mr-2" /> : <FileText className="mr-2 h-4 w-4" />}
+              PDF ({filterTitle})
+            </Button>
+            <Button
+              onClick={handleBulkResend}
+              disabled={isBulkResending || unvoted.length === 0}
+              variant="outline"
+              className="border-border/40 hover:bg-muted"
+            >
+              {isBulkResending ? <Spinner size="sm" className="mr-2" /> : <Send className="mr-2 h-4 w-4" />}
+              Re-send code to all {unvoted.length} non-voters
+            </Button>
+          </div>
         </div>
 
         {isLoading && (
