@@ -36,7 +36,17 @@ export async function finalizeStageIfDue(regionOverride?: string): Promise<void>
   if (preset.mode !== "danger" || preset.results.advance <= 0) return
 
   // Marker is per region as well as per round, so each edition finalizes once.
-  const markerKey = regionSettingKey(region, `stage_finalized_round_${round}`)
+  const markerName = `stage_finalized_round_${round}`
+  const markerKey = regionSettingKey(region, markerName)
+
+  // CRITICAL: Bauchi's markers were written before regions existed, under the
+  // bare key. Checking only the namespaced key would find nothing for an
+  // already-finalized round and re-run the advancement on live results —
+  // reshuffling Revived/Eliminated on a competition that already concluded.
+  // readRegionSetting applies the same legacy fallback used for every other
+  // Bauchi setting, so a past finalization is still recognised.
+  const existingMarker = await readRegionSetting(region, markerName)
+  if (existingMarker !== null) return
 
   // Atomic claim: only the first request past the deadline performs the move.
   const alreadyClaimed = await SettingModel.findOneAndUpdate(
