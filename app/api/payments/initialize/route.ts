@@ -2,8 +2,10 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import https from "https"
 
-import { connectToDatabase, TicketModel, TeamModel, SettingModel } from "@/lib/mongodb"
+import { connectToDatabase, TicketModel, TeamModel } from "@/lib/mongodb"
 import { generateVotingCode } from "@/lib/code-utils"
+import { getActiveRegion, regionFilter } from "@/lib/regions"
+import { readRegionSetting, readRegionNumber } from "@/lib/settings"
 
 const initializeSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -81,12 +83,14 @@ export async function POST(request: Request) {
     // Once the voting deadline has passed, code sales pause until the admin
     // sets up the next stage. Before a scheduled start, sales are allowed so
     // supporters can have their codes ready when voting opens.
-    const [startSetting, deadlineSetting] = await Promise.all([
-      SettingModel.findOne({ key: "voting_start" }).lean(),
-      SettingModel.findOne({ key: "voting_deadline" }).lean(),
+    // Codes are always sold for the LIVE edition.
+    const region = await getActiveRegion()
+    const [startValue, deadlineValue] = await Promise.all([
+      readRegionSetting(region, "voting_start"),
+      readRegionSetting(region, "voting_deadline"),
     ])
-    if (deadlineSetting?.value) {
-      const deadline = new Date(deadlineSetting.value)
+    if (deadlineValue) {
+      const deadline = new Date(deadlineValue)
       if (!Number.isNaN(deadline.getTime()) && Date.now() > deadline.getTime()) {
         return NextResponse.json(
           { error: "Voting has closed for this stage. Code sales will resume when the next stage opens." },
@@ -96,8 +100,8 @@ export async function POST(request: Request) {
     }
     // Code sales open ONLY when voting is open: no purchases before the
     // scheduled start (the countdown gates buying too, not just voting).
-    if (startSetting?.value) {
-      const start = new Date(startSetting.value)
+    if (startValue) {
+      const start = new Date(startValue)
       if (!Number.isNaN(start.getTime()) && Date.now() < start.getTime()) {
         return NextResponse.json(
           { error: "Voting has not started yet. Code sales open when the countdown ends." },
@@ -108,11 +112,10 @@ export async function POST(request: Request) {
 
     // A ticket can only be useful if there is something to vote on: an open team
     // in regular mode, or at least one Danger Zone poet during blind auditions.
-    const modeSetting = await SettingModel.findOne({ key: "voting_mode" }).lean()
-    const votingMode = modeSetting?.value === "danger" ? "danger" : "teams"
+    const votingMode = (await readRegionSetting(region, "voting_mode")) === "danger" ? "danger" : "teams"
 
     if (votingMode === "danger") {
-      const dangerCount = await TeamModel.countDocuments({ "participants.inDanger": true })
+      const dangerCount = await TeamModel.countDocuments({ ...regionFilter(region), "participants.inDanger": true })
       if (dangerCount === 0) {
         return NextResponse.json(
           { error: "Voting is not open right now. Please wait for the next stage." },
@@ -120,7 +123,7 @@ export async function POST(request: Request) {
         )
       }
     } else {
-      const openTeamCount = await TeamModel.countDocuments({ votingOpen: true })
+      const openTeamCount = await TeamModel.countDocuments({ ...regionFilter(region), votingOpen: true })
       if (openTeamCount === 0) {
         return NextResponse.json(
           { error: "Voting is not open right now. Please wait for the next round." },
@@ -130,12 +133,13 @@ export async function POST(request: Request) {
     }
 
     // Tickets belong to the current round. Admin advances the round to reset limits.
-    const roundSetting = await SettingModel.findOne({ key: "current_round" }).lean()
-    const round = roundSetting ? parseInt(roundSetting.value, 10) || 1 : 1
+    const round = await readRegionNumber(region, "current_round", 1)
 
-    // One ticket per email per round: a new round frees the same email to buy again.
+    // One ticket per email per round OF THIS REGION: a new round — or a new
+    // edition — frees the same email to buy again.
     const normalizedEmail = parsed.data.email.toLowerCase().trim()
     const existingPaidTicket = await TicketModel.findOne({
+      ...regionFilter(region),
       email: normalizedEmail,
       isPaid: true,
       round,
@@ -166,6 +170,7 @@ export async function POST(request: Request) {
       amount: TICKET_PRICE,
       isPaid: false,
       round,
+      region,
     })
 
     // Initialize Paystack payment. The post-payment redirect goes back to the

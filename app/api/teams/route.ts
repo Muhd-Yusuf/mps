@@ -6,6 +6,7 @@ import { connectToDatabase, TeamModel } from "@/lib/mongodb"
 import { authOptions } from "@/lib/auth"
 import { finalizeStageIfDue } from "@/lib/finalize"
 import { requireAdmin } from "@/lib/auth"
+import { regionFromRequest, regionForWrite, regionFilter } from "@/lib/regions"
 
 const coachSchema = z.object({
   name: z.string().min(1, "Coach name is required"),
@@ -29,6 +30,7 @@ const teamSchema = z.object({
   color: z.string().min(1, "Team color is required"),
   coach: coachSchema,
   participants: z.array(participantSchema).optional(),
+  region: z.string().optional(),
 })
 
 function normalizeString(value?: string | null) {
@@ -63,16 +65,22 @@ function serializeTeam(team: any, includeVotes = true) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions)
     await connectToDatabase()
+    // Admins can scope to any edition (or "all"); the public always sees the
+    // live one, so a finished region's poets never appear on the vote page.
+    const region = await regionFromRequest(request)
     // Applies the automatic top-N advancement the first time anyone loads
     // teams after a danger-stage deadline has passed.
     await finalizeStageIfDue().catch((error) => console.error("[AUTO_FINALIZE_ERROR]", error))
-    const teams = await TeamModel.find().sort({ order: 1, createdAt: 1 }).lean()
+    const teams = await TeamModel.find(regionFilter(region)).sort({ order: 1, createdAt: 1 }).lean()
 
-    return NextResponse.json({ teams: teams.map((team) => serializeTeam(team, Boolean(session))) })
+    return NextResponse.json({
+      teams: teams.map((team) => serializeTeam(team, Boolean(session))),
+      region,
+    })
   } catch (error) {
     console.error("[GET_TEAMS_ERROR]", error)
     return NextResponse.json({ error: "Failed to fetch teams" }, { status: 500 })
@@ -106,11 +114,13 @@ export async function POST(request: Request) {
       image: normalizeString(parsed.data.coach.image),
     }
 
+    // New teams belong to the edition the admin is working in.
     const document = {
       name: parsed.data.name.trim(),
       color: parsed.data.color.trim(),
       coach,
       participants,
+      region: await regionForWrite(request, parsed.data.region),
     }
 
     const createdTeam = await TeamModel.create(document)

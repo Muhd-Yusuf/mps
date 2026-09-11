@@ -2,7 +2,9 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import mongoose from "mongoose"
 
-import { connectToDatabase, TicketModel, VoteModel, TeamModel, SettingModel } from "@/lib/mongodb"
+import { connectToDatabase, TicketModel, VoteModel, TeamModel } from "@/lib/mongodb"
+import { getActiveRegion, getRegion, DEFAULT_REGION } from "@/lib/regions"
+import { readRegionSetting, readRegionNumber } from "@/lib/settings"
 
 export async function POST(request: Request) {
   try {
@@ -30,28 +32,30 @@ export async function POST(request: Request) {
 
     await connectToDatabase()
 
+    // Votes always belong to the LIVE edition — never to whatever region an
+    // admin happens to be viewing in the dashboard.
+    const region = await getActiveRegion()
+
     // Current round: a ticket may only be used to vote in the round it was bought for.
-    const roundSetting = await SettingModel.findOne({ key: "current_round" }).lean()
-    const currentRound = roundSetting ? parseInt(roundSetting.value, 10) || 1 : 1
+    const currentRound = await readRegionNumber(region, "current_round", 1)
 
     // Stage mode: "teams" (regular team voting) or "danger" (blind-audition save vote).
-    const modeSetting = await SettingModel.findOne({ key: "voting_mode" }).lean()
-    const votingMode = modeSetting?.value === "danger" ? "danger" : "teams"
+    const votingMode = (await readRegionSetting(region, "voting_mode")) === "danger" ? "danger" : "teams"
 
     // Voting window: both ends enforced server-side so the public countdown is
     // real — no votes before the scheduled start or after the deadline.
-    const [startSetting, deadlineSetting] = await Promise.all([
-      SettingModel.findOne({ key: "voting_start" }).lean(),
-      SettingModel.findOne({ key: "voting_deadline" }).lean(),
+    const [startValue, deadlineValue] = await Promise.all([
+      readRegionSetting(region, "voting_start"),
+      readRegionSetting(region, "voting_deadline"),
     ])
-    if (startSetting?.value) {
-      const start = new Date(startSetting.value)
+    if (startValue) {
+      const start = new Date(startValue)
       if (!Number.isNaN(start.getTime()) && Date.now() < start.getTime()) {
         return NextResponse.json({ error: "Voting has not started yet" }, { status: 400 })
       }
     }
-    if (deadlineSetting?.value) {
-      const deadline = new Date(deadlineSetting.value)
+    if (deadlineValue) {
+      const deadline = new Date(deadlineValue)
       if (!Number.isNaN(deadline.getTime()) && Date.now() > deadline.getTime()) {
         return NextResponse.json({ error: "Voting has closed for this stage" }, { status: 400 })
       }
@@ -82,6 +86,16 @@ export async function POST(request: Request) {
       )
     }
 
+    // A code bought for another edition (e.g. a leftover Bauchi code) can never
+    // be spent in the region that is live now.
+    const ticketRegion = ticket.region || DEFAULT_REGION
+    if (ticketRegion !== region) {
+      return NextResponse.json(
+        { error: `This voting code was bought for the ${getRegion(ticketRegion).short} edition and cannot be used here` },
+        { status: 400 }
+      )
+    }
+
     const selection = parsed.data.selections[0]
 
     let teamObjectId: mongoose.Types.ObjectId
@@ -94,6 +108,11 @@ export async function POST(request: Request) {
     const team = await TeamModel.findById(teamObjectId)
     if (!team) {
       return NextResponse.json({ error: "Team not found" }, { status: 400 })
+    }
+
+    // Guard against a stale page voting for a team from a finished edition.
+    if ((team.region || DEFAULT_REGION) !== region) {
+      return NextResponse.json({ error: "This team is not part of the current edition" }, { status: 400 })
     }
 
     const participant = team.participants?.find((p: any) => p._id.toString() === selection.participantId)
@@ -129,6 +148,7 @@ export async function POST(request: Request) {
       participantId: selection.participantId,
       teamId: selection.teamId,
       round: currentRound,
+      region,
     })
 
     await TeamModel.updateOne(
