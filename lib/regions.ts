@@ -83,6 +83,10 @@ export async function regionForWrite(request: Request, bodyRegion?: string | nul
  * Mongo filter for a region-scoped collection. "all" matches everything;
  * a real region also matches legacy documents written before regions existed,
  * which are Bauchi's.
+ *
+ * CAUTION: for Bauchi this returns an `$or`. Spreading it into an object that
+ * also has its own `$or` key silently drops the region filter — combine them
+ * with `$and: [regionFilter(region), { $or: [...] }]` instead.
  */
 export function regionFilter(region: string): Record<string, unknown> {
   if (region === ALL_REGIONS) return {}

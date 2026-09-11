@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 
 import { connectToDatabase, SettingModel } from "@/lib/mongodb"
+import { requireAdmin } from "@/lib/auth"
 
 const settingsSchema = z.object({
     maxVotes: z.number().min(1, "Max votes must be at least 1"),
@@ -25,6 +26,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    // The only mutation endpoint that was missing an auth check. The key it
+    // writes is unused by the app, but an unauthenticated write into the
+    // settings collection is not something to leave open.
+    const session = await requireAdmin()
+    if (!session) {
+        return NextResponse.json({ error: "Admin session required" }, { status: 401 })
+    }
     try {
         const payload = await request.json()
         const parsed = settingsSchema.safeParse(payload)
