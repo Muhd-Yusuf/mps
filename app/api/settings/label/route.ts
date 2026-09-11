@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
-import { connectToDatabase, SettingModel } from "@/lib/mongodb"
 import { requireAdmin } from "@/lib/auth"
+import { regionFromRequest, regionForWrite } from "@/lib/regions"
+import { readRegionSetting, writeRegionSetting } from "@/lib/settings"
 
 const LABEL_KEY = "team_label"
 const DEFAULT_LABEL = "Team"
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    await connectToDatabase()
-    const setting = await SettingModel.findOne({ key: LABEL_KEY }).lean()
-    return NextResponse.json({ label: setting?.value || DEFAULT_LABEL })
+    const region = await regionFromRequest(request)
+    const value = await readRegionSetting(region, LABEL_KEY)
+    return NextResponse.json({ label: value || DEFAULT_LABEL, region })
   } catch (error) {
     console.error("[GET_LABEL_ERROR]", error)
     return NextResponse.json({ error: "Failed to fetch label" }, { status: 500 })
@@ -20,6 +21,7 @@ export async function GET() {
 
 const labelSchema = z.object({
   label: z.string().trim().min(1, "Label is required").max(30),
+  region: z.string().optional(),
 })
 
 export async function POST(request: Request) {
@@ -35,15 +37,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    await connectToDatabase()
+    const region = await regionForWrite(request, parsed.data.region)
+    await writeRegionSetting(region, LABEL_KEY, parsed.data.label)
 
-    const updated = await SettingModel.findOneAndUpdate(
-      { key: LABEL_KEY },
-      { value: parsed.data.label },
-      { upsert: true, new: true, lean: true }
-    )
-
-    return NextResponse.json({ label: updated?.value || DEFAULT_LABEL })
+    return NextResponse.json({ label: parsed.data.label, region })
   } catch (error) {
     console.error("[UPDATE_LABEL_ERROR]", error)
     return NextResponse.json({ error: "Failed to update label" }, { status: 500 })

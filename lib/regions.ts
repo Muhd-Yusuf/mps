@@ -61,6 +61,25 @@ export async function setActiveRegion(key: string): Promise<string> {
 }
 
 /**
+ * Region for a READ request: `?region=` when an admin is scoping the dashboard
+ * (including "all"), otherwise the live edition the public is voting in.
+ */
+export async function regionFromRequest(request: Request): Promise<string> {
+  const param = new URL(request.url).searchParams.get("region")
+  return resolveRegionParam(param, await getActiveRegion())
+}
+
+/**
+ * Region for a WRITE request. Same resolution, but "all" is meaningless when
+ * storing a value, so it collapses to the live edition.
+ */
+export async function regionForWrite(request: Request, bodyRegion?: string | null): Promise<string> {
+  if (isRegionKey(bodyRegion)) return bodyRegion as string
+  const region = await regionFromRequest(request)
+  return region === ALL_REGIONS ? await getActiveRegion() : region
+}
+
+/**
  * Mongo filter for a region-scoped collection. "all" matches everything;
  * a real region also matches legacy documents written before regions existed,
  * which are Bauchi's.
