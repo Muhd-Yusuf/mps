@@ -3,10 +3,15 @@
 //   node scripts/import-contestants.mjs           # dry run: parse + download check only
 //   node scripts/import-contestants.mjs --live    # download, upload to Cloudinary, write to DB
 //   node scripts/import-contestants.mjs --live --team "Contestants"
+//   node scripts/import-contestants.mjs --live --region kaduna --sheet <id>
 //
 // Reads credentials from .env.import (pulled via `vercel env pull`). Idempotent:
 // poets already in the target team (matched by name) are skipped, so it can be
 // re-run after partial failures.
+//
+// --region is REQUIRED for any edition other than Bauchi. The holding team is
+// looked up per region, so importing Kaduna can never append poets to Bauchi's
+// existing "Contestants" team.
 
 import fs from "node:fs"
 import path from "node:path"
@@ -22,10 +27,21 @@ for (const line of fs.readFileSync(envFile, "utf8").split("\n")) {
   if (match && !process.env[match[1]]) process.env[match[1]] = match[2]
 }
 
-const SHEET_ID = "1CML7R1MYu-WIYbu8-LZQdpizz0nBUwnSjGHD5jr8fP4"
+const argValue = (flag, fallback) => {
+  const i = process.argv.indexOf(flag)
+  return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback
+}
+
+// Each edition has its own contestant sheet — pass --sheet for a new region.
+const SHEET_ID = argValue("--sheet", "1CML7R1MYu-WIYbu8-LZQdpizz0nBUwnSjGHD5jr8fP4")
 const LIVE = process.argv.includes("--live")
-const teamArgIndex = process.argv.indexOf("--team")
-const TEAM_NAME = teamArgIndex > -1 ? process.argv[teamArgIndex + 1] : "Contestants"
+const TEAM_NAME = argValue("--team", "Contestants")
+const REGIONS = ["bauchi", "kaduna", "nasarawa", "abuja"]
+const REGION = argValue("--region", "bauchi")
+if (!REGIONS.includes(REGION)) {
+  console.error(`Unknown --region "${REGION}". Expected one of: ${REGIONS.join(", ")}`)
+  process.exit(1)
+}
 const CACHE_DIR = path.join(projectRoot, ".import-cache")
 fs.mkdirSync(CACHE_DIR, { recursive: true })
 
@@ -139,7 +155,14 @@ cloudinary.config({
 await mongoose.connect(process.env.MONGODB_URI, { dbName: process.env.MONGODB_DB || undefined })
 const TeamModel = mongoose.model("Team", new mongoose.Schema({}, { strict: false, collection: "teams" }))
 
-let team = await TeamModel.findOne({ name: TEAM_NAME })
+// Scoped to the edition: Bauchi's teams predate the region field, so match
+// those by "bauchi or unset" exactly as regionFilter() does in the app.
+const regionMatch =
+  REGION === "bauchi"
+    ? { $or: [{ region: "bauchi" }, { region: { $exists: false } }, { region: null }] }
+    : { region: REGION }
+
+let team = await TeamModel.findOne({ ...regionMatch, name: TEAM_NAME })
 if (!team) {
   team = await TeamModel.create({
     name: TEAM_NAME,
@@ -148,10 +171,11 @@ if (!team) {
     votingOpen: false,
     order: 0,
     participants: [],
+    region: REGION,
     createdAt: new Date(),
     updatedAt: new Date(),
   })
-  console.log(`Created holding team "${TEAM_NAME}"`)
+  console.log(`Created holding team "${TEAM_NAME}" in the ${REGION} edition`)
 }
 
 const existingNames = new Set((team.participants ?? []).map((p) => (p.name ?? "").toLowerCase()))
