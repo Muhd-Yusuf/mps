@@ -496,7 +496,7 @@ export default function AdminPage() {
 
           <TabsContent value="results" className="animate-fade-in-up">
             <AdminStageManager region={viewRegion} />
-            <AdminVotingResults teams={teams} isLoading={isLoadingTeams} />
+            <AdminVotingResults teams={teams} isLoading={isLoadingTeams} region={viewRegion} />
           </TabsContent>
 
           <TabsContent value="charts" className="animate-fade-in-up">
@@ -504,7 +504,7 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="teams" className="animate-fade-in-up">
-            <AdminTeamManager teams={teams} isLoading={isLoadingTeams} onRefresh={fetchTeams} />
+            <AdminTeamManager teams={teams} isLoading={isLoadingTeams} region={viewRegion} onRefresh={fetchTeams} />
           </TabsContent>
           <TabsContent value="voters" className="animate-fade-in-up">
             <AdminVoterLog region={viewRegion} />
