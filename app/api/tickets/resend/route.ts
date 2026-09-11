@@ -30,11 +30,16 @@ export async function POST(request: Request) {
 
     // Most recent paid ticket for this email in the current round (legacy
     // tickets without a round are included so old buyers aren't stranded).
+    // $and, not a spread: regionFilter() returns its own $or for Bauchi, which a
+    // second $or key in the same object literal would silently overwrite —
+    // dropping the region filter entirely.
     const ticket = await TicketModel.findOne({
-      ...regionFilter(region),
+      $and: [
+        regionFilter(region),
+        { $or: [{ round: currentRound }, { round: null }, { round: { $exists: false } }] },
+      ],
       email,
       isPaid: true,
-      $or: [{ round: currentRound }, { round: null }, { round: { $exists: false } }],
     }).sort({ paidAt: -1 })
 
     if (ticket) {

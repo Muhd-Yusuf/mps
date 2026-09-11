@@ -90,6 +90,27 @@ for (const r of REGIONS.filter((r) => r !== DEFAULT_REGION)) {
     `round=${round} deadline=${deadline} teams=${teams}`)
 }
 
+console.log("\n=== cross-edition query leaks ===")
+// regionFilter() returns an $or for Bauchi, so spreading it beside another $or
+// silently drops the region filter. Compare the naive spread against the
+// correct $and form for EVERY edition: the moment a second edition has
+// tickets, a leaky query starts matching them and this check fires.
+for (const r of REGIONS) {
+  const round = Number(await readRegionSetting(r, "current_round")) || 1
+  const roundOr = [{ round }, { round: null }, { round: { $exists: false } }]
+  const naive = await db.collection("tickets").countDocuments({
+    ...regionFilter(r),
+    isPaid: true,
+    $or: roundOr,
+  })
+  const correct = await db.collection("tickets").countDocuments({
+    $and: [regionFilter(r), { $or: roundOr }],
+    isPaid: true,
+  })
+  check(`${r}: resend-shaped query cannot reach another edition`, naive === correct,
+    naive === correct ? `${correct} ticket(s)` : `naive spread matches ${naive}, correct is ${correct}`)
+}
+
 console.log("\n=== bauchi keeps its state ===")
 const bRound = await readRegionSetting(DEFAULT_REGION, "current_round")
 const bPreset = await readRegionSetting(DEFAULT_REGION, "stage_preset")
