@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { LogOut, Lock, BarChart3, RefreshCw } from "lucide-react"
+import { LogOut, Lock, BarChart3, RefreshCw, ArrowLeft, ShieldCheck } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { useSession, signIn, signOut } from "next-auth/react"
 
@@ -28,6 +28,13 @@ export default function AdminPage() {
   const { data: session, status } = useSession()
   const [password, setPassword] = useState("")
   const [isLoginLoading, setIsLoginLoading] = useState(false)
+  // Login is two-step whenever an OTP email is configured in Settings:
+  // password → emailed 6-digit code. With no address stored, step 1 signs in
+  // directly and the code screen is never shown.
+  const [loginStep, setLoginStep] = useState<"password" | "otp">("password")
+  const [otp, setOtp] = useState("")
+  const [otpSentTo, setOtpSentTo] = useState("")
+  const [resendIn, setResendIn] = useState(0)
 
   const [teams, setTeams] = useState<TeamWithParticipants[]>([])
   const [isLoadingTeams, setIsLoadingTeams] = useState(false)
@@ -39,25 +46,62 @@ export default function AdminPage() {
   const isAuthenticated = status === "authenticated"
   const isLoadingAuth = status === "loading"
 
-  const handleLogin = async () => {
-    if (!password) return
+  // Tick down the resend cooldown so the button re-enables on its own.
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const timer = setTimeout(() => setResendIn((seconds) => seconds - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendIn])
 
-    setIsLoginLoading(true)
-    try {
+  const completeSignIn = useCallback(
+    async (code?: string) => {
       const result = await signIn("credentials", {
         password,
+        otp: code ?? "",
         redirect: false,
       })
 
       if (result?.error) {
         toast.error("Access Denied", {
-          description: "Incorrect password",
+          description: code ? "That code is wrong or has expired" : "Incorrect password",
         })
-      } else {
-        toast.success("Success", {
-          description: "Logged in successfully",
-        })
+        return false
       }
+
+      toast.success("Success", { description: "Logged in successfully" })
+      return true
+    },
+    [password]
+  )
+
+  // Step 1 — check the password server-side and, if OTP is configured, send the
+  // code. The code is only ever mailed; it never comes back in this response.
+  const handleLogin = async () => {
+    if (!password) return
+
+    setIsLoginLoading(true)
+    try {
+      const response = await fetch("/api/admin/otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        toast.error("Access Denied", { description: data?.error || "Incorrect password" })
+        return
+      }
+
+      if (!data?.otpRequired) {
+        await completeSignIn()
+        return
+      }
+
+      setOtpSentTo(data.sentTo ?? "your email")
+      setLoginStep("otp")
+      setResendIn(data.cooldown ?? 60)
+      toast.success("Verification required", { description: data.message })
     } catch (error) {
       toast.error("Error", {
         description: "Something went wrong during login",
@@ -65,6 +109,53 @@ export default function AdminPage() {
     } finally {
       setIsLoginLoading(false)
     }
+  }
+
+  // Step 2 — password + code are re-checked together inside NextAuth's
+  // authorize(), so a code alone can never create a session.
+  const handleVerifyOtp = async () => {
+    if (otp.trim().length !== 6) {
+      toast.error("Enter the 6-digit code from your email")
+      return
+    }
+    setIsLoginLoading(true)
+    try {
+      const ok = await completeSignIn(otp.trim())
+      if (!ok) setOtp("")
+    } catch (error) {
+      toast.error("Error", { description: "Something went wrong during login" })
+    } finally {
+      setIsLoginLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (resendIn > 0) return
+    setIsLoginLoading(true)
+    try {
+      const response = await fetch("/api/admin/otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.error("Could not resend", { description: data?.error || "Try again shortly" })
+        return
+      }
+      setResendIn(data.cooldown ?? 60)
+      toast.success("Code sent", { description: data.message })
+    } catch (error) {
+      toast.error("Could not resend", { description: "Try again shortly" })
+    } finally {
+      setIsLoginLoading(false)
+    }
+  }
+
+  const resetLogin = () => {
+    setLoginStep("password")
+    setOtp("")
+    setOtpSentTo("")
   }
 
   const fetchTeams = useCallback(async () => {
@@ -179,28 +270,85 @@ export default function AdminPage() {
         <Card className="bg-white border-border/40 backdrop-blur w-full max-w-md shadow-2xl animate-fade-in-up">
           <CardHeader className="text-center">
             <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-6 h-6 text-primary-foreground" />
+              {loginStep === "otp" ? (
+                <ShieldCheck className="w-6 h-6 text-primary-foreground" />
+              ) : (
+                <Lock className="w-6 h-6 text-primary-foreground" />
+              )}
             </div>
-            <CardTitle className="text-foreground">Admin Login</CardTitle>
-            <CardDescription>Enter admin password to access the dashboard</CardDescription>
+            <CardTitle className="text-foreground">
+              {loginStep === "otp" ? "Verify It's You" : "Admin Login"}
+            </CardTitle>
+            <CardDescription>
+              {loginStep === "otp"
+                ? `Enter the 6-digit code sent to ${otpSentTo}`
+                : "Enter admin password to access the dashboard"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Input
-              type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              className="bg-input border-border/40 text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-colors"
-            />
-            <Button
-              onClick={handleLogin}
-              disabled={isLoginLoading}
-              className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300"
-            >
-              {isLoginLoading ? <Spinner size="sm" className="mr-2" /> : null}
-              Login
-            </Button>
+            {loginStep === "password" ? (
+              <>
+                <Input
+                  type="password"
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                  className="bg-input border-border/40 text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-colors"
+                />
+                <Button
+                  onClick={handleLogin}
+                  disabled={isLoginLoading}
+                  className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300"
+                >
+                  {isLoginLoading ? <Spinner size="sm" className="mr-2" /> : null}
+                  Login
+                </Button>
+              </>
+            ) : (
+              <>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  onKeyDown={(e) => e.key === "Enter" && handleVerifyOtp()}
+                  className="bg-input border-border/40 text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-colors text-center text-2xl tracking-[0.5em] font-mono"
+                />
+                <Button
+                  onClick={handleVerifyOtp}
+                  disabled={isLoginLoading}
+                  className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300"
+                >
+                  {isLoginLoading ? <Spinner size="sm" className="mr-2" /> : null}
+                  Verify & Login
+                </Button>
+                <div className="flex items-center justify-between text-sm">
+                  <button
+                    type="button"
+                    onClick={resetLogin}
+                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ArrowLeft className="w-3 h-3" />
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={resendIn > 0 || isLoginLoading}
+                    className="text-primary hover:underline disabled:text-muted-foreground disabled:no-underline"
+                  >
+                    {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  The code expires in 10 minutes. Check your spam folder if it hasn&apos;t arrived.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
