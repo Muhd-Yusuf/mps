@@ -20,7 +20,7 @@ type LedgerRow = {
 }
 type Stage = { key: string; label: string; from: string; to: string; count: number }
 
-export default function AdminVoterLog() {
+export default function AdminVoterLog({ region }: { region: string }) {
   const [rows, setRows] = useState<LedgerRow[]>([])
   const [stages, setStages] = useState<Stage[]>([])
   const [stage, setStage] = useState<string>("all")
@@ -32,7 +32,7 @@ export default function AdminVoterLog() {
   const perPage = 25
 
   useEffect(() => {
-    fetch("/api/votes/ledger", { cache: "no-store" })
+    fetch(`/api/votes/ledger?region=${encodeURIComponent(region)}`, { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error ?? "Failed to load")
         return res.json()

@@ -19,6 +19,8 @@ import AdminRevenue from "@/components/admin-revenue"
 import AdminSettings from "@/components/admin-settings"
 import AdminReport from "@/components/admin-report"
 import AdminVoterLog from "@/components/admin-voter-log"
+import AdminRegionSwitcher from "@/components/admin-region-switcher"
+import type { Region } from "@/lib/regions"
 
 const statsIcons = ["📊", "👥", "🎤", "📈"] as const
 
@@ -42,6 +44,13 @@ export default function AdminPage() {
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [codesSold, setCodesSold] = useState(0)
   const [codesUsed, setCodesUsed] = useState(0)
+
+  // Which regional edition the dashboard is reporting on. Defaults to the live
+  // one; "all" gives season totals. Purely a view filter — see the Settings tab
+  // to change what the audience is actually voting in.
+  const [regions, setRegions] = useState<Region[]>([])
+  const [activeRegion, setActiveRegion] = useState("")
+  const [viewRegion, setViewRegion] = useState("")
 
   const isAuthenticated = status === "authenticated"
   const isLoadingAuth = status === "loading"
@@ -159,15 +168,17 @@ export default function AdminPage() {
   }
 
   const fetchTeams = useCallback(async () => {
+    if (!viewRegion) return
     try {
       setIsLoadingTeams(true)
       setTeamsError(null)
       // One automatic retry: serverless cold starts occasionally time out the
       // first request — don't surface an error for a self-healing blip.
-      let response = await fetch("/api/teams", { cache: "no-store" }).catch(() => null)
+      const url = `/api/teams?region=${encodeURIComponent(viewRegion)}`
+      let response = await fetch(url, { cache: "no-store" }).catch(() => null)
       if (!response || !response.ok) {
         await new Promise((r) => setTimeout(r, 1500))
-        response = await fetch("/api/teams", { cache: "no-store" })
+        response = await fetch(url, { cache: "no-store" })
       }
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
@@ -187,7 +198,21 @@ export default function AdminPage() {
     } finally {
       setIsLoadingTeams(false)
     }
-  }, [])
+  }, [viewRegion])
+
+  // Load the edition list once signed in, and start on the live one.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    fetch("/api/regions", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!data) return
+        setRegions(data.regions ?? [])
+        setActiveRegion(data.active ?? "")
+        setViewRegion((current) => current || data.active || "")
+      })
+      .catch(() => toast.error("Could not load the region list"))
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -203,9 +228,12 @@ export default function AdminPage() {
       setTotalRevenue(0)
       return
     }
+    if (!viewRegion) return
     const fetchRevenue = async () => {
       try {
-        const response = await fetch("/api/payments", { cache: "no-store" })
+        const response = await fetch(`/api/payments?region=${encodeURIComponent(viewRegion)}`, {
+          cache: "no-store",
+        })
         if (!response.ok) {
           console.error("Failed to fetch revenue data")
           return
@@ -221,7 +249,7 @@ export default function AdminPage() {
       }
     }
     fetchRevenue()
-  }, [isAuthenticated])
+  }, [isAuthenticated, viewRegion])
 
   const totalParticipants = useMemo(
     () => teams.reduce((sum, team) => sum + (team.participants?.length ?? 0), 0),
@@ -244,7 +272,7 @@ export default function AdminPage() {
   }).format(totalRevenue)
 
   const stats = [
-    { label: "Total Votes", value: totalVotes },
+    { label: viewRegion === "all" ? "Total Votes (all regions)" : "Total Votes", value: totalVotes },
     { label: "Teams", value: teams.length },
     { label: "Poets", value: totalParticipants },
     {
@@ -368,6 +396,15 @@ export default function AdminPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            {regions.length > 0 && (
+              <AdminRegionSwitcher
+                regions={regions}
+                value={viewRegion}
+                onChange={setViewRegion}
+                activeRegion={activeRegion}
+                disabled={isLoadingTeams}
+              />
+            )}
             <Button
               variant="secondary"
               size="sm"
@@ -431,7 +468,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        <AdminReport />
+        <AdminReport region={viewRegion} />
 
         <Tabs defaultValue="results" className="space-y-6 w-full">
           <div className="w-full">
@@ -458,7 +495,7 @@ export default function AdminPage() {
           </div>
 
           <TabsContent value="results" className="animate-fade-in-up">
-            <AdminStageManager />
+            <AdminStageManager region={viewRegion} />
             <AdminVotingResults teams={teams} isLoading={isLoadingTeams} />
           </TabsContent>
 
@@ -470,13 +507,18 @@ export default function AdminPage() {
             <AdminTeamManager teams={teams} isLoading={isLoadingTeams} onRefresh={fetchTeams} />
           </TabsContent>
           <TabsContent value="voters" className="animate-fade-in-up">
-            <AdminVoterLog />
+            <AdminVoterLog region={viewRegion} />
           </TabsContent>
           <TabsContent value="revenue" className="animate-fade-in-up">
-            <AdminRevenue />
+            <AdminRevenue region={viewRegion} />
           </TabsContent>
           <TabsContent value="settings" className="animate-fade-in-up">
-            <AdminSettings />
+            <AdminSettings
+              region={viewRegion}
+              regions={regions}
+              activeRegion={activeRegion}
+              onActiveRegionChange={setActiveRegion}
+            />
           </TabsContent>
         </Tabs>
       </div>

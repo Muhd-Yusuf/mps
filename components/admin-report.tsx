@@ -29,13 +29,15 @@ const currency = new Intl.NumberFormat("en-NG", {
   maximumFractionDigits: 0,
 })
 
-async function loadReportData(): Promise<ReportData> {
+async function loadReportData(region: string): Promise<ReportData> {
+  // Reports cover the edition currently selected in the dashboard.
+  const q = `?region=${encodeURIComponent(region)}`
   const [teamsRes, paymentsRes, labelRes, presetRes, roundRes] = await Promise.all([
-    fetch("/api/teams", { cache: "no-store" }),
-    fetch("/api/payments", { cache: "no-store" }),
-    fetch("/api/settings/label", { cache: "no-store" }),
-    fetch("/api/settings/preset", { cache: "no-store" }),
-    fetch("/api/settings/round", { cache: "no-store" }),
+    fetch(`/api/teams${q}`, { cache: "no-store" }),
+    fetch(`/api/payments${q}`, { cache: "no-store" }),
+    fetch(`/api/settings/label${q}`, { cache: "no-store" }),
+    fetch(`/api/settings/preset${q}`, { cache: "no-store" }),
+    fetch(`/api/settings/round${q}`, { cache: "no-store" }),
   ])
 
   if (!teamsRes.ok) throw new Error("Failed to load teams")
@@ -299,14 +301,14 @@ async function buildPdf(data: ReportData, scope: ReportScope) {
   doc.save(`mps-report-${fileStamp(data.generatedAt)}.pdf`)
 }
 
-export default function AdminReport() {
+export default function AdminReport({ region }: { region: string }) {
   const [busy, setBusy] = useState<null | "csv" | "pdf">(null)
   const [scope, setScope] = useState<ReportScope>("full")
 
   const handleGenerate = async (format: "csv" | "pdf") => {
     try {
       setBusy(format)
-      const data = await loadReportData()
+      const data = await loadReportData(region)
       const suffix = scope === "full" ? "statement" : "results"
 
       if (format === "csv") {

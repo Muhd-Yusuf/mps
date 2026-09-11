@@ -14,7 +14,7 @@ type Filter = "all" | "voted" | "unvoted"
 
 const naira = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n)
 
-export default function AdminRevenue() {
+export default function AdminRevenue({ region }: { region: string }) {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,7 +30,7 @@ export default function AdminRevenue() {
       try {
         setIsLoading(true)
         setError(null)
-        const response = await fetch("/api/payments", { cache: "no-store" })
+        const response = await fetch(`/api/payments?region=${encodeURIComponent(region)}`, { cache: "no-store" })
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
           throw new Error(errorData?.error ?? "Unable to fetch revenue data")

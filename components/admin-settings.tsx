@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
-import { Save, RotateCw, Tag, Flame, CheckCircle2, Clock, XCircle, Lock, ShieldCheck, Send } from "lucide-react"
+import { Save, RotateCw, Tag, Flame, CheckCircle2, Clock, XCircle, Lock, ShieldCheck, Send, Radio } from "lucide-react"
 
 import { STAGE_PRESETS, getPreset } from "@/lib/stages"
+import type { Region } from "@/lib/regions"
 
 // ISO timestamp -> value for <input type="datetime-local"> in the admin's timezone.
 function toLocalInputValue(iso: string): string {
@@ -28,7 +29,16 @@ function advancementText(presetKey: string): string {
     return `Top ${advance} overall ${advanceLabel === "REVIVED" ? "are revived" : "advance"} by audience vote.`
 }
 
-export default function AdminSettings() {
+interface AdminSettingsProps {
+    /** Edition being edited (may be "all", in which case stage controls are hidden). */
+    region: string
+    regions: Region[]
+    /** Edition the public is voting in. */
+    activeRegion: string
+    onActiveRegionChange: (region: string) => void
+}
+
+export default function AdminSettings({ region, regions, activeRegion, onActiveRegionChange }: AdminSettingsProps) {
     const [teamLabel, setTeamLabel] = useState<string>("Team")
     const [round, setRound] = useState<number>(1)
     const [roundLabel, setRoundLabel] = useState<string>("")
@@ -51,20 +61,27 @@ export default function AdminSettings() {
     const [otpPassword, setOtpPassword] = useState("")
     const [isSavingOtpEmail, setIsSavingOtpEmail] = useState(false)
     const [isSendingTestCode, setIsSendingTestCode] = useState(false)
+    const [isSwitchingLive, setIsSwitchingLive] = useState(false)
+
+    // Every stage control below is scoped to the selected edition.
+    const q = `?region=${encodeURIComponent(region)}`
+    const viewingAll = region === "all"
+    const regionName = regions.find((r) => r.key === region)?.short ?? "this edition"
 
     useEffect(() => {
-        fetchSettings()
-    }, [])
+        if (region) fetchSettings()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [region])
 
     const fetchSettings = async () => {
         try {
             setIsLoading(true)
             const [labelRes, roundRes, presetRes, deadlineRes, startRes, otpRes] = await Promise.all([
-                fetch("/api/settings/label"),
-                fetch("/api/settings/round"),
-                fetch("/api/settings/preset"),
-                fetch("/api/settings/deadline"),
-                fetch("/api/settings/start"),
+                fetch(`/api/settings/label${q}`),
+                fetch(`/api/settings/round${q}`),
+                fetch(`/api/settings/preset${q}`),
+                fetch(`/api/settings/deadline${q}`),
+                fetch(`/api/settings/start${q}`),
                 fetch("/api/settings/otp-email"),
             ])
             if (labelRes.ok) setTeamLabel((await labelRes.json()).label)
@@ -105,7 +122,7 @@ export default function AdminSettings() {
         if (!confirm(message)) return
         try {
             setIsSavingPreset(true)
-            const response = await fetch("/api/settings/preset", {
+            const response = await fetch(`/api/settings/preset${q}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ preset: next.key }),
@@ -133,7 +150,7 @@ export default function AdminSettings() {
         try {
             setIsSavingStart(true)
             const iso = clear ? "" : new Date(startInput).toISOString()
-            const response = await fetch("/api/settings/start", {
+            const response = await fetch(`/api/settings/start${q}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ start: iso }),
@@ -161,7 +178,7 @@ export default function AdminSettings() {
         try {
             setIsSavingDeadline(true)
             const iso = clear ? "" : new Date(deadlineInput).toISOString()
-            const response = await fetch("/api/settings/deadline", {
+            const response = await fetch(`/api/settings/deadline${q}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ deadline: iso }),
@@ -212,6 +229,41 @@ export default function AdminSettings() {
             toast.error(error.message || "Error changing password")
         } finally {
             setIsChangingPassword(false)
+        }
+    }
+
+    // Switches which edition the AUDIENCE votes in. Deliberately separate from
+    // the dashboard's view switcher so reviewing old numbers can never take the
+    // public site to a finished region.
+    const handleSetLiveRegion = async () => {
+        if (viewingAll || region === activeRegion) return
+        if (
+            !confirm(
+                `Make ${regionName} the live edition?\n\n` +
+                `The public site will immediately show ${regionName}'s poets, and new voting codes ` +
+                `will be sold for it. The current live edition's results are kept untouched.`
+            )
+        ) {
+            return
+        }
+        try {
+            setIsSwitchingLive(true)
+            const response = await fetch("/api/regions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ region }),
+            })
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(typeof data.error === "string" ? data.error : "Failed to switch edition")
+            }
+            const data = await response.json()
+            onActiveRegionChange(data.active)
+            toast.success(`${regionName} is now live for voters`)
+        } catch (error: any) {
+            toast.error(error.message || "Error switching edition")
+        } finally {
+            setIsSwitchingLive(false)
         }
     }
 
@@ -289,7 +341,7 @@ export default function AdminSettings() {
     const handleSaveLabel = async () => {
         try {
             setIsSavingLabel(true)
-            const response = await fetch("/api/settings/label", {
+            const response = await fetch(`/api/settings/label${q}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ label: teamLabel.trim() || "Team" }),
@@ -311,7 +363,7 @@ export default function AdminSettings() {
     const handleSaveRoundLabel = async () => {
         try {
             setIsSavingRoundLabel(true)
-            const response = await fetch("/api/settings/round", {
+            const response = await fetch(`/api/settings/round${q}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "label", label: roundLabel.trim() }),
@@ -336,7 +388,7 @@ export default function AdminSettings() {
         }
         try {
             setIsAdvancing(true)
-            const response = await fetch("/api/settings/round", {
+            const response = await fetch(`/api/settings/round${q}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "advance" }),
@@ -366,6 +418,52 @@ export default function AdminSettings() {
 
     return (
         <div className="space-y-6">
+            <Card className="bg-white border-border/40 backdrop-blur shadow-sm">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Radio className="w-5 h-5 text-green-600" />
+                        <CardTitle>Live Edition</CardTitle>
+                    </div>
+                    <CardDescription>
+                        {viewingAll ? (
+                            <>
+                                You are viewing <strong>season totals across all regions</strong>. The stage,
+                                schedule and round controls below apply to a single edition — pick one in the
+                                switcher at the top of the page to change them.
+                            </>
+                        ) : (
+                            <>
+                                Everything on this tab applies to <strong>{regionName}</strong>. The audience is
+                                currently voting in{" "}
+                                <strong>{regions.find((r) => r.key === activeRegion)?.short ?? "—"}</strong>.
+                                Switching the live edition changes what the public site shows and which edition
+                                new voting codes are sold for; every other edition&apos;s results, revenue and
+                                voter log stay exactly as they are.
+                            </>
+                        )}
+                    </CardDescription>
+                </CardHeader>
+                {!viewingAll && (
+                    <CardContent>
+                        {region === activeRegion ? (
+                            <span className="inline-flex items-center gap-2 text-sm font-semibold text-green-700 bg-green-100 px-3 py-1.5 rounded-full">
+                                <Radio className="w-4 h-4" />
+                                {regionName} is live for voters
+                            </span>
+                        ) : (
+                            <Button
+                                onClick={handleSetLiveRegion}
+                                disabled={isSwitchingLive}
+                                className="bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20"
+                            >
+                                {isSwitchingLive ? <Spinner size="sm" className="mr-2" /> : <Radio className="w-4 h-4 mr-2" />}
+                                Make {regionName} the live edition
+                            </Button>
+                        )}
+                    </CardContent>
+                )}
+            </Card>
+
             <Card className="bg-white border-border/40 backdrop-blur shadow-sm">
                 <CardHeader>
                     <div className="flex items-center gap-2">
