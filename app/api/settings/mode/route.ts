@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
-import { connectToDatabase, SettingModel } from "@/lib/mongodb"
 import { requireAdmin } from "@/lib/auth"
+import { regionFromRequest, regionForWrite } from "@/lib/regions"
+import { readRegionSetting, writeRegionSetting } from "@/lib/settings"
 
 const MODE_KEY = "voting_mode"
 const DEFAULT_MODE = "teams"
@@ -12,14 +13,14 @@ const DEFAULT_MODE = "teams"
 //            listed with no team grouping and the public votes on who stays.
 const modeSchema = z.object({
   mode: z.enum(["teams", "danger"]),
+  region: z.string().optional(),
 })
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    await connectToDatabase()
-    const setting = await SettingModel.findOne({ key: MODE_KEY }).lean()
-    const mode = setting?.value === "danger" ? "danger" : DEFAULT_MODE
-    return NextResponse.json({ mode })
+    const region = await regionFromRequest(request)
+    const value = await readRegionSetting(region, MODE_KEY)
+    return NextResponse.json({ mode: value === "danger" ? "danger" : DEFAULT_MODE, region })
   } catch (error) {
     console.error("[GET_MODE_ERROR]", error)
     return NextResponse.json({ error: "Failed to fetch voting mode" }, { status: 500 })
@@ -39,15 +40,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    await connectToDatabase()
+    const region = await regionForWrite(request, parsed.data.region)
+    await writeRegionSetting(region, MODE_KEY, parsed.data.mode)
 
-    const updated = await SettingModel.findOneAndUpdate(
-      { key: MODE_KEY },
-      { value: parsed.data.mode },
-      { upsert: true, new: true, lean: true }
-    )
-
-    return NextResponse.json({ mode: updated?.value === "danger" ? "danger" : DEFAULT_MODE })
+    return NextResponse.json({ mode: parsed.data.mode, region })
   } catch (error) {
     console.error("[UPDATE_MODE_ERROR]", error)
     return NextResponse.json({ error: "Failed to update voting mode" }, { status: 500 })
