@@ -7,17 +7,29 @@ export const authOptions: AuthOptions = {
         CredentialsProvider({
             name: 'Credentials',
             credentials: {
-                password: { label: "Password", type: "password" }
+                password: { label: "Password", type: "password" },
+                otp: { label: "Login code", type: "text" }
             },
             async authorize(credentials) {
                 // Password is verified against the DB hash (source of truth once
                 // an admin has set it), falling back to ADMIN_PASSWORD for the
                 // very first login. See lib/admin-password.ts.
                 const { verifyAdminPassword } = await import("./admin-password")
-                if (credentials?.password && (await verifyAdminPassword(credentials.password))) {
-                    return { id: "1", name: "Admin", email: "admin@example.com" }
+                if (!credentials?.password || !(await verifyAdminPassword(credentials.password))) {
+                    return null
                 }
-                return null
+
+                // Second factor: required only while an OTP address is stored in
+                // settings, so the dashboard can't lock itself out before the
+                // feature is set up. See lib/admin-otp.ts.
+                const { getOtpEmail, verifyAndConsumeOtp } = await import("./admin-otp")
+                if (await getOtpEmail()) {
+                    if (!credentials.otp || !(await verifyAndConsumeOtp(credentials.otp))) {
+                        return null
+                    }
+                }
+
+                return { id: "1", name: "Admin", email: "admin@example.com" }
             }
         })
     ],

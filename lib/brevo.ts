@@ -131,6 +131,84 @@ export function createVotingCodeEmailTemplate(votingCode: string, appUrl?: strin
   `.trim()
 }
 
+export function createAdminOtpEmailTemplate(code: string, minutes: number): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login Code</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f5f5; padding: 20px;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">MPS Media Poetry Challenge</h1>
+              <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">Admin Login Verification</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 20px; color: #1a1a1a; font-size: 24px; font-weight: 600;">Your login code 🔐</h2>
+
+              <p style="margin: 0 0 20px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
+                Someone entered the correct admin password for the dashboard. Enter the code below to finish signing in.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0;">
+                <p style="margin: 0 0 10px; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">Login Code</p>
+                <p style="margin: 0; color: #ffffff; font-size: 36px; font-weight: bold; letter-spacing: 8px; font-family: 'Courier New', monospace;">${code}</p>
+              </div>
+
+              <p style="margin: 20px 0; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
+                This code expires in <strong>${minutes} minutes</strong> and can only be used once.
+              </p>
+
+              <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e5e5;">
+                <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                  <strong>Didn't try to log in?</strong> Someone else knows the admin password. Ignore this code and
+                  change the admin password immediately from Settings once you're back in.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 30px 40px; text-align: center; background-color: #f9f9f9; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #999999; font-size: 12px;">
+                © ${new Date().getFullYear()} MPS Media Poetry Challenge. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}
+
+export function createAdminOtpEmailText(code: string, minutes: number): string {
+  return `
+MPS Media Poetry Challenge - Admin Login Verification
+
+Your login code: ${code}
+
+Someone entered the correct admin password for the dashboard. Enter this code to finish signing in.
+It expires in ${minutes} minutes and can only be used once.
+
+Didn't try to log in? Someone else knows the admin password. Ignore this code and change the admin password immediately from Settings once you're back in.
+
+© ${new Date().getFullYear()} MPS Media Poetry Challenge. All rights reserved.
+  `.trim()
+}
+
 export function createVotingCodeEmailText(votingCode: string, appUrl?: string): string {
   const voteUrl = appUrl ? `${appUrl}/vote` : "/vote"
 
