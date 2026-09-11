@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { connectToDatabase, TicketModel } from "@/lib/mongodb"
 import { requireAdmin } from "@/lib/auth"
+import { regionFromRequest, regionFilter } from "@/lib/regions"
 
 function serializeTicket(ticket: any) {
   return {
@@ -16,16 +17,19 @@ function serializeTicket(ticket: any) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await requireAdmin()
   if (!session) {
     return NextResponse.json({ error: "Admin session required" }, { status: 401 })
   }
   try {
     await connectToDatabase()
-    const tickets = await TicketModel.find({ isPaid: true }).sort({ createdAt: -1 }).lean()
+    const region = await regionFromRequest(request)
+    const tickets = await TicketModel.find({ ...regionFilter(region), isPaid: true })
+      .sort({ createdAt: -1 })
+      .lean()
 
-    return NextResponse.json({ tickets: tickets.map(serializeTicket) })
+    return NextResponse.json({ tickets: tickets.map(serializeTicket), region })
   } catch (error) {
     console.error("[GET_PAYMENTS_ERROR]", error)
     return NextResponse.json({ error: "Failed to fetch payments" }, { status: 500 })

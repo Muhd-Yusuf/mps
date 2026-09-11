@@ -1,5 +1,7 @@
 import { SettingModel, TeamModel } from "./mongodb"
 import { getPreset, presetFromMode } from "./stages"
+import { getActiveRegion, regionFilter } from "./regions"
+import { readRegionSetting, readRegionNumber, regionSettingKey } from "./settings"
 
 const ELIMINATED_TEAM = "Eliminated"
 const REVIVED_TEAM = "Revived"
@@ -15,23 +17,26 @@ const REVIVED_TEAM = "Revived"
 // Team-voting stages (e.g. Quarter Final) are NOT auto-finalized: their open
 // team lists also contain judges' picks, which the audience result must not
 // eliminate. The admin applies those from the ranked results instead.
-export async function finalizeStageIfDue(): Promise<void> {
-  const [deadlineSetting, presetSetting, modeSetting, roundSetting] = await Promise.all([
-    SettingModel.findOne({ key: "voting_deadline" }).lean(),
-    SettingModel.findOne({ key: "stage_preset" }).lean(),
-    SettingModel.findOne({ key: "voting_mode" }).lean(),
-    SettingModel.findOne({ key: "current_round" }).lean(),
+export async function finalizeStageIfDue(regionOverride?: string): Promise<void> {
+  // Only ever finalizes the LIVE edition — a dashboard visit that happens to be
+  // scoped to a finished region must not re-run its advancement.
+  const region = regionOverride ?? (await getActiveRegion())
+  const [deadlineValue, presetValue, modeValue, round] = await Promise.all([
+    readRegionSetting(region, "voting_deadline"),
+    readRegionSetting(region, "stage_preset"),
+    readRegionSetting(region, "voting_mode"),
+    readRegionNumber(region, "current_round", 1),
   ])
 
-  if (!deadlineSetting?.value) return
-  const deadline = new Date(deadlineSetting.value)
+  if (!deadlineValue) return
+  const deadline = new Date(deadlineValue)
   if (Number.isNaN(deadline.getTime()) || Date.now() <= deadline.getTime()) return
 
-  const preset = presetSetting?.value ? getPreset(presetSetting.value) : presetFromMode(modeSetting?.value)
+  const preset = presetValue ? getPreset(presetValue) : presetFromMode(modeValue ?? undefined)
   if (preset.mode !== "danger" || preset.results.advance <= 0) return
 
-  const round = roundSetting ? parseInt(roundSetting.value, 10) || 1 : 1
-  const markerKey = `stage_finalized_round_${round}`
+  // Marker is per region as well as per round, so each edition finalizes once.
+  const markerKey = regionSettingKey(region, `stage_finalized_round_${round}`)
 
   // Atomic claim: only the first request past the deadline performs the move.
   const alreadyClaimed = await SettingModel.findOneAndUpdate(
@@ -42,7 +47,7 @@ export async function finalizeStageIfDue(): Promise<void> {
   if (alreadyClaimed) return
 
   try {
-    const teams = await TeamModel.find()
+    const teams = await TeamModel.find(regionFilter(region))
     const flagged = teams.flatMap((team: any) =>
       (team.participants ?? [])
         .filter((p: any) => p.inDanger)
@@ -70,8 +75,10 @@ export async function finalizeStageIfDue(): Promise<void> {
       eliminated = ranked.slice(advance)
     }
 
+    // Each edition gets its OWN archive teams — Kaduna's eliminated poets must
+    // not land in the same bucket as Bauchi's.
     const ensureTeam = async (name: string, color: string, order: number) => {
-      let team = await TeamModel.findOne({ name })
+      let team = await TeamModel.findOne({ ...regionFilter(region), name })
       if (!team) {
         team = await TeamModel.create({
           name,
@@ -80,6 +87,7 @@ export async function finalizeStageIfDue(): Promise<void> {
           votingOpen: false,
           order,
           participants: [],
+          region,
         })
       }
       return team
@@ -119,7 +127,7 @@ export async function finalizeStageIfDue(): Promise<void> {
         }),
       }
     )
-    console.log(`[AUTO_FINALIZE] round ${round} (${preset.key}): advanced ${advanced.length}, eliminated ${eliminated.length}`)
+    console.log(`[AUTO_FINALIZE] ${region} round ${round} (${preset.key}): advanced ${advanced.length}, eliminated ${eliminated.length}`)
   } catch (error) {
     // Release the claim so a later request can retry the finalization.
     await SettingModel.deleteOne({ key: markerKey, value: "running" }).catch(() => {})

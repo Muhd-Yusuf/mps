@@ -2,10 +2,11 @@ import { NextResponse } from "next/server"
 
 import { connectToDatabase, TeamModel, VoteModel, TicketModel } from "@/lib/mongodb"
 import { requireAdmin } from "@/lib/auth"
+import { regionFromRequest, regionFilter } from "@/lib/regions"
 
 // Admin-only voter ledger: every vote with the buyer's email + code, the poet
 // they chose, and when. Reconstructed from the immutable vote records.
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await requireAdmin()
     if (!session) {
@@ -14,10 +15,14 @@ export async function GET() {
 
     await connectToDatabase()
 
+    // Scoped to the edition being viewed, so a region's ledger only ever
+    // shows its own voters.
+    const region = await regionFromRequest(request)
+    const scope = regionFilter(region)
     const [votes, tickets, teams] = await Promise.all([
-      VoteModel.find().sort({ createdAt: -1 }).lean(),
-      TicketModel.find().lean(),
-      TeamModel.find().lean(),
+      VoteModel.find(scope).sort({ createdAt: -1 }).lean(),
+      TicketModel.find(scope).lean(),
+      TeamModel.find(scope).lean(),
     ])
 
     const ticketById = new Map(tickets.map((t: any) => [t._id.toString(), t]))
