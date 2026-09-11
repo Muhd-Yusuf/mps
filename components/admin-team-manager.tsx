@@ -42,6 +42,8 @@ import {
 type AdminTeamManagerProps = {
   teams: Team[]
   isLoading: boolean
+  /** Edition being viewed — new teams are created inside it. */
+  region: string
   onRefresh: () => Promise<void> | void
 }
 
@@ -51,7 +53,7 @@ const emptyParticipant: ParticipantDraft = { name: "", image: "" }
 
 const placeholderImage = "/placeholder.svg"
 
-export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminTeamManagerProps) {
+export default function AdminTeamManager({ teams, isLoading, region, onRefresh }: AdminTeamManagerProps) {
   const { toast } = useToast()
   const [isCreatingTeam, setIsCreatingTeam] = useState(false)
   const [newTeamForm, setNewTeamForm] = useState({
@@ -287,7 +289,7 @@ export default function AdminTeamManager({ teams, isLoading, onRefresh }: AdminT
           image: participant.image?.trim(),
         }))
 
-      const response = await fetch("/api/teams", {
+      const response = await fetch(`/api/teams?region=${encodeURIComponent(region)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
-import { connectToDatabase, TicketModel, SettingModel } from "@/lib/mongodb"
+import { connectToDatabase, TicketModel } from "@/lib/mongodb"
+import { getActiveRegion, regionFilter } from "@/lib/regions"
+import { readRegionNumber } from "@/lib/settings"
 import { sendEmail, createVotingCodeEmailTemplate, createVotingCodeEmailText } from "@/lib/brevo"
 
 const resendSchema = z.object({
@@ -19,14 +21,17 @@ export async function POST(request: Request) {
 
     await connectToDatabase()
 
-    const roundSetting = await SettingModel.findOne({ key: "current_round" }).lean()
-    const currentRound = roundSetting ? parseInt(roundSetting.value, 10) || 1 : 1
+    // Scoped to the live edition: a Bauchi code must never be re-sent to
+    // someone asking for their Kaduna one.
+    const region = await getActiveRegion()
+    const currentRound = await readRegionNumber(region, "current_round", 1)
 
     const email = parsed.data.email.toLowerCase().trim()
 
     // Most recent paid ticket for this email in the current round (legacy
     // tickets without a round are included so old buyers aren't stranded).
     const ticket = await TicketModel.findOne({
+      ...regionFilter(region),
       email,
       isPaid: true,
       $or: [{ round: currentRound }, { round: null }, { round: { $exists: false } }],

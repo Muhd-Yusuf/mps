@@ -11,6 +11,8 @@ import { LoadingSpinner } from "@/components/ui/spinner"
 type AdminVotingResultsProps = {
   teams: Team[]
   isLoading: boolean
+  /** Edition being viewed — stage, round and history all follow it. */
+  region: string
 }
 
 const placeholderImage = "/placeholder.svg"
@@ -105,7 +107,7 @@ type HistoryRound = {
 }
 type HistoryResult = { name: string; team: string; votes: number; advanced: boolean }
 
-export default function AdminVotingResults({ teams, isLoading }: AdminVotingResultsProps) {
+export default function AdminVotingResults({ teams, isLoading, region }: AdminVotingResultsProps) {
   const [preset, setPreset] = useState<StagePreset>(getPreset(null))
   const [currentRound, setCurrentRound] = useState<number | null>(null)
   const [historyRounds, setHistoryRounds] = useState<HistoryRound[]>([])
@@ -114,26 +116,28 @@ export default function AdminVotingResults({ teams, isLoading }: AdminVotingResu
   const [historyLoading, setHistoryLoading] = useState(false)
 
   useEffect(() => {
-    fetch("/api/settings/preset", { cache: "no-store" })
+    if (!region) return
+    const q = `?region=${encodeURIComponent(region)}`
+    fetch(`/api/settings/preset${q}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => data && setPreset(getPreset(data.preset)))
       .catch(() => {})
-    fetch("/api/settings/round", { cache: "no-store" })
+    fetch(`/api/settings/round${q}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => data && setCurrentRound(data.round))
       .catch(() => {})
-    fetch("/api/votes/history", { cache: "no-store" })
+    fetch(`/api/votes/history${q}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => data && setHistoryRounds(data.rounds ?? []))
       .catch(() => {})
-  }, [])
+  }, [region])
 
   const viewRound = async (round: number | "legacy") => {
     setSelectedRound(round)
     setHistoryLoading(true)
     setHistoryResults(null)
     try {
-      const res = await fetch(`/api/votes/history?round=${round}`, { cache: "no-store" })
+      const res = await fetch(`/api/votes/history?round=${round}&region=${encodeURIComponent(region)}`, { cache: "no-store" })
       if (res.ok) setHistoryResults((await res.json()).results ?? [])
     } catch {
       /* keep null -> error text below */

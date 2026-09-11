@@ -66,7 +66,12 @@ export async function GET(request: Request) {
     }
 
     const round = roundParam === "legacy" ? null : parseInt(roundParam, 10)
-    const match = round == null ? { round: { $in: [null, undefined] } } : { round }
+    // Scoped to the edition being viewed: Kaduna round 1 and Bauchi round 1 are
+    // different stages and must never be summed into one result table.
+    const match = {
+      ...scope,
+      ...(round == null ? { round: { $in: [null, undefined] } } : { round }),
+    }
     const grouped = await VoteModel.aggregate([
       { $match: match },
       { $group: { _id: "$participantId", votes: { $sum: 1 } } },
