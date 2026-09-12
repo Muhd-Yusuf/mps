@@ -26,10 +26,10 @@ export async function GET(request: Request) {
     ])
 
     const ticketById = new Map(tickets.map((t: any) => [t._id.toString(), t]))
-    const poetById = new Map<string, { name: string; team: string; origin?: string }>()
+    const poetById = new Map<string, { name: string; team: string; origin?: string; image?: string }>()
     for (const team of teams) {
       for (const p of team.participants ?? []) {
-        poetById.set(p._id.toString(), { name: p.name, team: team.name, origin: p.originTeam })
+        poetById.set(p._id.toString(), { name: p.name, team: team.name, origin: p.originTeam, image: p.image })
       }
     }
 
@@ -86,6 +86,7 @@ export async function GET(request: Request) {
         email: ticket?.email ?? "(unknown ticket)",
         votingCode: ticket?.votingCode ?? "—",
         poet: poet?.name ?? "(poet removed)",
+        poetImage: poet?.image ?? "",
         team: poet ? poet.origin || poet.team : "—",
         stageKey: stageOf.get(v._id.toString()) ?? "session-0",
         at: v.createdAt?.toISOString?.() ?? v.createdAt,

@@ -7,6 +7,37 @@ import { LoadingSpinner } from "@/components/ui/spinner"
 import { BarChart3, PieChart, Trophy } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from "recharts"
 
+// Recharts renders axis labels as plain <text>. A poet must never appear as a
+// bare name, so the tick draws their portrait beside it (clipped to a circle).
+function PoetAxisTick({ x, y, payload, poets }: any) {
+  const poet = poets.find((p: any) => p.name === payload.value)
+  const label = String(payload.value ?? "")
+  const short = label.length > 18 ? `${label.slice(0, 17)}…` : label
+  const clipId = `poet-clip-${String(payload.value).replace(/[^a-zA-Z0-9]/g, "")}-${payload.index ?? 0}`
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <defs>
+        <clipPath id={clipId}>
+          <circle cx={-134} cy={0} r={11} />
+        </clipPath>
+      </defs>
+      <image
+        href={poet?.image || "/placeholder.svg"}
+        x={-145}
+        y={-11}
+        width={22}
+        height={22}
+        clipPath={`url(#${clipId})`}
+        preserveAspectRatio="xMidYMid slice"
+      />
+      <circle cx={-134} cy={0} r={11} fill="none" stroke="#e5e5e5" strokeWidth={1} />
+      <text x={-118} y={4} fontSize={12} fill="#4a4a4a" textAnchor="start">
+        {short}
+      </text>
+    </g>
+  )
+}
+
 type AdminChartsProps = {
   teams: Team[]
   isLoading: boolean
@@ -60,6 +91,7 @@ export default function AdminCharts({ teams, isLoading }: AdminChartsProps) {
           name: p.name,
           votes: p.votes ?? 0,
           team: team?.name || "Unknown",
+          image: p.image || "/placeholder.svg",
         }
       })
   }, [allParticipants, teams])
@@ -182,7 +214,13 @@ export default function AdminCharts({ teams, isLoading }: AdminChartsProps) {
             <BarChart data={topParticipantsData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
               <XAxis type="number" fontSize={12} />
-              <YAxis dataKey="name" type="category" width={120} fontSize={12} />
+              <YAxis
+                dataKey="name"
+                type="category"
+                width={150}
+                fontSize={12}
+                tick={(props) => <PoetAxisTick {...props} poets={topParticipantsData} />}
+              />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "rgba(255, 255, 255, 0.95)",

@@ -79,10 +79,11 @@ export async function GET(request: Request) {
     ])
 
     // Resolve poets wherever they live NOW (teams, Revived, Eliminated).
-    const poetById = new Map<string, { name: string; team: string; originTeam?: string }>()
+    // Carry the portrait through: a poet is never listed by name alone.
+    const poetById = new Map<string, { name: string; team: string; originTeam?: string; image?: string }>()
     for (const t of teams) {
       for (const p of t.participants ?? []) {
-        poetById.set(p._id.toString(), { name: p.name, team: t.name, originTeam: p.originTeam })
+        poetById.set(p._id.toString(), { name: p.name, team: t.name, originTeam: p.originTeam, image: p.image })
       }
     }
     const advancedNames = new Set<string>(
@@ -94,6 +95,7 @@ export async function GET(request: Request) {
       return {
         name: poet?.name ?? "(poet no longer in system)",
         team: poet ? poet.originTeam || poet.team : "—",
+        image: poet?.image ?? "",
         votes: g.votes,
         advanced: poet ? advancedNames.has(poet.name) : false,
       }
