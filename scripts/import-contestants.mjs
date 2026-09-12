@@ -4,6 +4,7 @@
 //   node scripts/import-contestants.mjs --live    # download, upload to Cloudinary, write to DB
 //   node scripts/import-contestants.mjs --live --team "Contestants"
 //   node scripts/import-contestants.mjs --live --region kaduna --sheet <id>
+//   node scripts/import-contestants.mjs --live --region kaduna --csv <path>
 //
 // Reads credentials from .env.import (pulled via `vercel env pull`). Idempotent:
 // poets already in the target team (matched by name) are skipped, so it can be
@@ -34,6 +35,9 @@ const argValue = (flag, fallback) => {
 
 // Each edition has its own contestant sheet — pass --sheet for a new region.
 const SHEET_ID = argValue("--sheet", "1CML7R1MYu-WIYbu8-LZQdpizz0nBUwnSjGHD5jr8fP4")
+// Some editions arrive as a spreadsheet file rather than a shared Google Sheet.
+// Same 3 columns either way: full name, stage name, Drive photo URL.
+const CSV_PATH = argValue("--csv", null)
 const LIVE = process.argv.includes("--live")
 const TEAM_NAME = argValue("--team", "Contestants")
 const REGIONS = ["bauchi", "kaduna", "nasarawa", "abuja"]
@@ -69,10 +73,16 @@ function parseCsv(text) {
 }
 
 async function fetchSheet() {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`
-  const res = await fetch(url, { redirect: "follow" })
-  if (!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`)
-  const rows = parseCsv(await res.text())
+  let text
+  if (CSV_PATH) {
+    text = fs.readFileSync(CSV_PATH, "utf8")
+  } else {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`
+    const res = await fetch(url, { redirect: "follow" })
+    if (!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`)
+    text = await res.text()
+  }
+  const rows = parseCsv(text)
   return rows.slice(1).map((r, i) => {
     const fullName = (r[0] ?? "").trim()
     const stageName = (r[1] ?? "").trim()
@@ -138,7 +148,7 @@ try {
 if (!LIVE) {
   console.log("\nDry run only. Sample rows:")
   for (const c of contestants.slice(0, 5)) console.log(`  ${c.fullName} | ${c.stageName || "(no stage name)"} | ${c.fileId}`)
-  console.log(`\nRe-run with --live to import all ${contestants.length} into team "${TEAM_NAME}".`)
+  console.log(`\nRe-run with --live to import all ${contestants.length} into team "${TEAM_NAME}" of the ${REGION} edition.`)
   process.exit(0)
 }
 

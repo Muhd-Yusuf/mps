@@ -81,13 +81,40 @@ for (const coll of ["teams", "tickets", "votes"]) {
   check(`${coll}: no document carries an unknown region`, stray === 0, `${stray} stray`)
 }
 
-console.log("\n=== new editions start clean ===")
-for (const r of REGIONS.filter((r) => r !== DEFAULT_REGION)) {
-  const round = await readRegionSetting(r, "current_round")
-  const deadline = await readRegionSetting(r, "voting_deadline")
-  const teams = await db.collection("teams").countDocuments(regionFilter(r))
-  check(`${r}: no inherited round/deadline/teams`, round === null && deadline === null && teams === 0,
-    `round=${round} deadline=${deadline} teams=${teams}`)
+console.log("\n=== editions inherit nothing from each other ===")
+// The real invariant is NOT "has no teams" — an edition legitimately owns teams
+// once its contestants are imported. What must never happen is an edition
+// resolving ANOTHER edition's settings, or its filter picking up documents that
+// are not actually stamped with it.
+for (const r of REGIONS.filter((x) => x !== DEFAULT_REGION)) {
+  const scoped = await S.findOne({ key: `${r}:current_round` })
+  const resolved = await readRegionSetting(r, "current_round")
+  const expected = scoped?.value ?? null
+  check(`${r}: current_round never falls back to another edition`, resolved === expected,
+    `resolved=${resolved} own-key=${expected}`)
+
+  const scopedDeadline = await S.findOne({ key: `${r}:voting_deadline` })
+  const resolvedDeadline = await readRegionSetting(r, "voting_deadline")
+  check(`${r}: voting_deadline never falls back to another edition`,
+    resolvedDeadline === (scopedDeadline?.value ?? null))
+
+  // Every document the filter returns must genuinely carry this region.
+  for (const coll of ["teams", "tickets", "votes"]) {
+    const matched = await db.collection(coll).countDocuments(regionFilter(r))
+    const trulyStamped = await db.collection(coll).countDocuments({ region: r })
+    check(`${r}: ${coll} filter returns only ${r}-stamped docs`, matched === trulyStamped,
+      `${matched} matched vs ${trulyStamped} stamped`)
+  }
+}
+
+// Bauchi is the legacy edition: its filter intentionally also matches documents
+// written before the region field existed.
+for (const coll of ["teams", "tickets", "votes"]) {
+  const legacy = await db.collection(coll).countDocuments({ region: { $exists: false } })
+  const matched = await db.collection(coll).countDocuments(regionFilter(DEFAULT_REGION))
+  const stamped = await db.collection(coll).countDocuments({ region: DEFAULT_REGION })
+  check(`${DEFAULT_REGION}: ${coll} = stamped + legacy`, matched === stamped + legacy,
+    `${matched} = ${stamped} + ${legacy}`)
 }
 
 console.log("\n=== cross-edition query leaks ===")
