@@ -105,7 +105,7 @@ type HistoryRound = {
   finalizedAt?: string
   advanced?: string[]
 }
-type HistoryResult = { name: string; team: string; votes: number; advanced: boolean }
+type HistoryResult = { name: string; team: string; image?: string; votes: number; advanced: boolean }
 
 export default function AdminVotingResults({ teams, isLoading, region }: AdminVotingResultsProps) {
   const [preset, setPreset] = useState<StagePreset>(getPreset(null))
@@ -239,6 +239,9 @@ export default function AdminVotingResults({ teams, isLoading, region }: AdminVo
                         <span className="text-xs font-bold text-muted-foreground w-5 text-right flex-shrink-0">
                           {index + 1}
                         </span>
+                        <div className="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-border/40">
+                          <Image src={r.image || placeholderImage} alt={r.name} fill className="object-cover" />
+                        </div>
                         <span className="font-medium text-foreground truncate">{r.name}</span>
                         <span className="text-xs text-muted-foreground truncate hidden sm:inline">{r.team}</span>
                         {r.advanced && (
