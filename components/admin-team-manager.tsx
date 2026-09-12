@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Image from "next/image"
-import { Plus, UserPlus, Trash2, Edit2, Radio, Flame, ArrowRightLeft, Search } from "lucide-react"
+import { Plus, UserPlus, Trash2, Edit2, Radio, Flame, ArrowRightLeft, Search, ImagePlus } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 
 import type { Team, Participant } from "@/lib/types"
@@ -106,6 +106,7 @@ export default function AdminTeamManager({ teams, isLoading, region, onRefresh }
   const [isDeletingTeam, setIsDeletingTeam] = useState(false)
   const [togglingTeamId, setTogglingTeamId] = useState<string | null>(null)
   const [togglingDangerId, setTogglingDangerId] = useState<string | null>(null)
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null)
   const [movingParticipantId, setMovingParticipantId] = useState<string | null>(null)
   const [bulkFlaggingTeamId, setBulkFlaggingTeamId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
@@ -575,6 +576,41 @@ export default function AdminTeamManager({ teams, isLoading, region, onRefresh }
       })
     } finally {
       setTogglingTeamId(null)
+    }
+  }
+
+  // A poet must never appear as a bare name. Poets added by hand arrive with no
+  // portrait, so the admin can set one directly from their row.
+  const handlePoetPhotoUpload = async (
+    team: Team,
+    participant: Participant,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    try {
+      setUploadingPhotoId(participant.id)
+      const url = await uploadImage(file, "mps/contestants")
+      const response = await fetch(`/api/teams/${team.id}/participants/${participant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: url }),
+      })
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error?.error ?? "Unable to save the photo")
+      }
+      toast({ title: "Photo updated", description: `${participant.name} now has a portrait.` })
+      await onRefresh?.()
+    } catch (error: any) {
+      toast({
+        title: "Failed to upload photo",
+        description: error?.message ?? "Please try again later",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingPhotoId(null)
     }
   }
 
@@ -1068,10 +1104,37 @@ export default function AdminTeamManager({ teams, isLoading, region, onRefresh }
                       </div>
                       <div>
                         <p className="font-medium text-foreground">{participant.name}</p>
-                          <p className="text-sm text-muted-foreground">{participant.votes ?? 0} votes</p>
+                          <p className="text-sm text-muted-foreground">
+                            {participant.votes ?? 0} votes
+                            {!participant.image && (
+                              <span className="ml-2 text-amber-600 font-medium">· no photo</span>
+                            )}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {/* Set or replace this poet's portrait. */}
+                        <label
+                          className={`inline-flex items-center gap-1.5 text-xs rounded-md border px-2 py-1.5 cursor-pointer transition-colors ${
+                            participant.image
+                              ? "border-border/40 text-muted-foreground hover:bg-muted"
+                              : "border-amber-400 text-amber-700 hover:bg-amber-50"
+                          } ${uploadingPhotoId === participant.id ? "pointer-events-none opacity-60" : ""}`}
+                          title={participant.image ? "Replace photo" : "This poet has no photo — add one"}
+                        >
+                          {uploadingPhotoId === participant.id ? (
+                            <Spinner size="sm" />
+                          ) : (
+                            <ImagePlus className="h-3.5 w-3.5" />
+                          )}
+                          <span className="hidden sm:inline">{participant.image ? "Photo" : "Add photo"}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) => handlePoetPhotoUpload(team, participant, event)}
+                          />
+                        </label>
                         {participant.originTeam && (
                           <Badge variant="outline" className="text-muted-foreground border-border/60">
                             from {participant.originTeam}
