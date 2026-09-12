@@ -29,13 +29,15 @@ const currency = new Intl.NumberFormat("en-NG", {
   maximumFractionDigits: 0,
 })
 
-async function loadReportData(): Promise<ReportData> {
+async function loadReportData(region: string): Promise<ReportData> {
+  // Reports cover the edition currently selected in the dashboard.
+  const q = `?region=${encodeURIComponent(region)}`
   const [teamsRes, paymentsRes, labelRes, presetRes, roundRes] = await Promise.all([
-    fetch("/api/teams", { cache: "no-store" }),
-    fetch("/api/payments", { cache: "no-store" }),
-    fetch("/api/settings/label", { cache: "no-store" }),
-    fetch("/api/settings/preset", { cache: "no-store" }),
-    fetch("/api/settings/round", { cache: "no-store" }),
+    fetch(`/api/teams${q}`, { cache: "no-store" }),
+    fetch(`/api/payments${q}`, { cache: "no-store" }),
+    fetch(`/api/settings/label${q}`, { cache: "no-store" }),
+    fetch(`/api/settings/preset${q}`, { cache: "no-store" }),
+    fetch(`/api/settings/round${q}`, { cache: "no-store" }),
   ])
 
   if (!teamsRes.ok) throw new Error("Failed to load teams")
@@ -73,8 +75,50 @@ type RankedRow = {
   rank: number
   team: string
   name: string
+  image: string
   votes: number
   status: string
+}
+
+// Cloudinary can resize on delivery, so the PDF pulls 64px face-cropped thumbs
+// instead of full portraits — 187 poets stay a few hundred KB, not tens of MB.
+function thumbUrl(url: string, size = 64): string {
+  if (!url) return ""
+  return url.includes("/image/upload/")
+    ? url.replace("/image/upload/", `/image/upload/w_${size},h_${size},c_fill,g_face,f_jpg,q_auto/`)
+    : url
+}
+
+async function toDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+/** Fetch every poet portrait as a data URL, capped concurrency. */
+async function loadPortraits(rows: RankedRow[]): Promise<Map<string, string>> {
+  const urls = [...new Set(rows.map((r) => r.image).filter(Boolean))]
+  const out = new Map<string, string>()
+  let cursor = 0
+  const workers = Array.from({ length: Math.min(8, urls.length) }, async () => {
+    while (cursor < urls.length) {
+      const url = urls[cursor++]
+      const data = await toDataUrl(thumbUrl(url))
+      if (data) out.set(url, data)
+    }
+  })
+  await Promise.all(workers)
+  return out
 }
 
 // Rank poets the way the current stage counts them: danger stages rank only the
@@ -87,7 +131,7 @@ function rankForStage(teams: Team[], preset: StagePreset): RankedRow[] {
   const pool = teams.flatMap((team) =>
     (team.participants ?? [])
       .filter((p) => (isDanger ? p.inDanger : true))
-      .map((p) => ({ team: team.name, name: p.name, votes: p.votes ?? 0 }))
+      .map((p) => ({ team: team.name, name: p.name, votes: p.votes ?? 0, image: p.image || "" }))
   )
 
   if (slice === "perTeam" && advance > 0) {
@@ -102,6 +146,7 @@ function rankForStage(teams: Team[], preset: StagePreset): RankedRow[] {
             rank: index + 1,
             team: p.team,
             name: p.name,
+            image: p.image,
             votes: p.votes,
             status: index < advance && p.votes > 0 ? advanceLabel : "",
           })
@@ -116,6 +161,7 @@ function rankForStage(teams: Team[], preset: StagePreset): RankedRow[] {
       rank: index + 1,
       team: p.team,
       name: p.name,
+      image: p.image,
       votes: p.votes,
       status: advance > 0 && index < advance && p.votes > 0 ? advanceLabel : "",
     }))
@@ -179,10 +225,10 @@ function buildCsv(data: ReportData, scope: ReportScope) {
   }
   lines.push("")
   const hasStatus = data.preset.results.advance > 0
-  lines.push(`Rank,${escapeCsv(data.label)},Contestant,Votes${hasStatus ? ",Status" : ""}`)
+  lines.push(`Rank,${escapeCsv(data.label)},Contestant,Photo,Votes${hasStatus ? ",Status" : ""}`)
 
   s.ranked.forEach((p) => {
-    const row = [p.rank, escapeCsv(p.team), escapeCsv(p.name), p.votes]
+    const row = [p.rank, escapeCsv(p.team), escapeCsv(p.name), escapeCsv(p.image), p.votes]
     if (hasStatus) row.push(escapeCsv(p.status))
     lines.push(row.join(","))
   })
@@ -271,8 +317,12 @@ async function buildPdf(data: ReportData, scope: ReportScope) {
   })
 
   const hasStatus = data.preset.results.advance > 0
+  // Every listed poet carries their portrait. The photo column is drawn in
+  // didDrawCell; the cell text stays empty so nothing overlaps the image.
+  const portraits = await loadPortraits(s.ranked)
   const ranked = s.ranked.map((p) => [
     String(p.rank),
+    "",
     p.team,
     p.name,
     String(p.votes),
@@ -282,14 +332,31 @@ async function buildPdf(data: ReportData, scope: ReportScope) {
   autoTable(doc, {
     ...pageOpts,
     startY: (doc as any).lastAutoTable.finalY + 8,
-    head: [["Rank", data.label, "Contestant", "Votes", ...(hasStatus ? ["Status"] : [])]],
+    head: [["Rank", "Photo", data.label, "Contestant", "Votes", ...(hasStatus ? ["Status"] : [])]],
     body: ranked,
     theme: "striped",
     headStyles: { fillColor: BRAND_PURPLE },
+    styles: { minCellHeight: 11, valign: "middle" },
+    columnStyles: { 1: { cellWidth: 13 } },
+    didDrawCell: (hook: any) => {
+      if (hook.section !== "body" || hook.column.index !== 1) return
+      const row = s.ranked[hook.row.index]
+      const data64 = row?.image ? portraits.get(row.image) : null
+      if (!data64) return
+      const size = 9
+      const x = hook.cell.x + (hook.cell.width - size) / 2
+      const y = hook.cell.y + (hook.cell.height - size) / 2
+      try {
+        doc.addImage(data64, "JPEG", x, y, size, size)
+      } catch {
+        // A single unreadable portrait must never abort the whole report.
+      }
+    },
     // Bold the qualifying rows so the cut-off is obvious at a glance.
     didParseCell: hasStatus
       ? (hook: any) => {
-          if (hook.section === "body" && hook.row.raw?.[4]) {
+          // Status moved to index 5 when the Photo column was inserted at 1.
+          if (hook.section === "body" && hook.row.raw?.[5]) {
             hook.cell.styles.fontStyle = "bold"
           }
         }
@@ -299,14 +366,14 @@ async function buildPdf(data: ReportData, scope: ReportScope) {
   doc.save(`mps-report-${fileStamp(data.generatedAt)}.pdf`)
 }
 
-export default function AdminReport() {
+export default function AdminReport({ region }: { region: string }) {
   const [busy, setBusy] = useState<null | "csv" | "pdf">(null)
   const [scope, setScope] = useState<ReportScope>("full")
 
   const handleGenerate = async (format: "csv" | "pdf") => {
     try {
       setBusy(format)
-      const data = await loadReportData()
+      const data = await loadReportData(region)
       const suffix = scope === "full" ? "statement" : "results"
 
       if (format === "csv") {

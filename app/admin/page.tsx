@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { LogOut, Lock, BarChart3, RefreshCw } from "lucide-react"
+import { LogOut, Lock, BarChart3, RefreshCw, ArrowLeft, ShieldCheck } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { useSession, signIn, signOut } from "next-auth/react"
 
@@ -19,6 +19,8 @@ import AdminRevenue from "@/components/admin-revenue"
 import AdminSettings from "@/components/admin-settings"
 import AdminReport from "@/components/admin-report"
 import AdminVoterLog from "@/components/admin-voter-log"
+import AdminRegionSwitcher from "@/components/admin-region-switcher"
+import type { Region } from "@/lib/regions"
 
 const statsIcons = ["📊", "👥", "🎤", "📈"] as const
 
@@ -28,6 +30,13 @@ export default function AdminPage() {
   const { data: session, status } = useSession()
   const [password, setPassword] = useState("")
   const [isLoginLoading, setIsLoginLoading] = useState(false)
+  // Login is two-step whenever an OTP email is configured in Settings:
+  // password → emailed 6-digit code. With no address stored, step 1 signs in
+  // directly and the code screen is never shown.
+  const [loginStep, setLoginStep] = useState<"password" | "otp">("password")
+  const [otp, setOtp] = useState("")
+  const [otpSentTo, setOtpSentTo] = useState("")
+  const [resendIn, setResendIn] = useState(0)
 
   const [teams, setTeams] = useState<TeamWithParticipants[]>([])
   const [isLoadingTeams, setIsLoadingTeams] = useState(false)
@@ -36,28 +45,72 @@ export default function AdminPage() {
   const [codesSold, setCodesSold] = useState(0)
   const [codesUsed, setCodesUsed] = useState(0)
 
+  // Which regional edition the dashboard is reporting on. Defaults to the live
+  // one; "all" gives season totals. Purely a view filter — see the Settings tab
+  // to change what the audience is actually voting in.
+  const [regions, setRegions] = useState<Region[]>([])
+  const [activeRegion, setActiveRegion] = useState("")
+  const [viewRegion, setViewRegion] = useState("")
+
   const isAuthenticated = status === "authenticated"
   const isLoadingAuth = status === "loading"
 
-  const handleLogin = async () => {
-    if (!password) return
+  // Tick down the resend cooldown so the button re-enables on its own.
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const timer = setTimeout(() => setResendIn((seconds) => seconds - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendIn])
 
-    setIsLoginLoading(true)
-    try {
+  const completeSignIn = useCallback(
+    async (code?: string) => {
       const result = await signIn("credentials", {
         password,
+        otp: code ?? "",
         redirect: false,
       })
 
       if (result?.error) {
         toast.error("Access Denied", {
-          description: "Incorrect password",
+          description: code ? "That code is wrong or has expired" : "Incorrect password",
         })
-      } else {
-        toast.success("Success", {
-          description: "Logged in successfully",
-        })
+        return false
       }
+
+      toast.success("Success", { description: "Logged in successfully" })
+      return true
+    },
+    [password]
+  )
+
+  // Step 1 — check the password server-side and, if OTP is configured, send the
+  // code. The code is only ever mailed; it never comes back in this response.
+  const handleLogin = async () => {
+    if (!password) return
+
+    setIsLoginLoading(true)
+    try {
+      const response = await fetch("/api/admin/otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        toast.error("Access Denied", { description: data?.error || "Incorrect password" })
+        return
+      }
+
+      if (!data?.otpRequired) {
+        await completeSignIn()
+        return
+      }
+
+      setOtpSentTo(data.sentTo ?? "your email")
+      setLoginStep("otp")
+      setResendIn(data.cooldown ?? 60)
+      toast.success("Verification required", { description: data.message })
     } catch (error) {
       toast.error("Error", {
         description: "Something went wrong during login",
@@ -67,16 +120,65 @@ export default function AdminPage() {
     }
   }
 
+  // Step 2 — password + code are re-checked together inside NextAuth's
+  // authorize(), so a code alone can never create a session.
+  const handleVerifyOtp = async () => {
+    if (otp.trim().length !== 6) {
+      toast.error("Enter the 6-digit code from your email")
+      return
+    }
+    setIsLoginLoading(true)
+    try {
+      const ok = await completeSignIn(otp.trim())
+      if (!ok) setOtp("")
+    } catch (error) {
+      toast.error("Error", { description: "Something went wrong during login" })
+    } finally {
+      setIsLoginLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (resendIn > 0) return
+    setIsLoginLoading(true)
+    try {
+      const response = await fetch("/api/admin/otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.error("Could not resend", { description: data?.error || "Try again shortly" })
+        return
+      }
+      setResendIn(data.cooldown ?? 60)
+      toast.success("Code sent", { description: data.message })
+    } catch (error) {
+      toast.error("Could not resend", { description: "Try again shortly" })
+    } finally {
+      setIsLoginLoading(false)
+    }
+  }
+
+  const resetLogin = () => {
+    setLoginStep("password")
+    setOtp("")
+    setOtpSentTo("")
+  }
+
   const fetchTeams = useCallback(async () => {
+    if (!viewRegion) return
     try {
       setIsLoadingTeams(true)
       setTeamsError(null)
       // One automatic retry: serverless cold starts occasionally time out the
       // first request — don't surface an error for a self-healing blip.
-      let response = await fetch("/api/teams", { cache: "no-store" }).catch(() => null)
+      const url = `/api/teams?region=${encodeURIComponent(viewRegion)}`
+      let response = await fetch(url, { cache: "no-store" }).catch(() => null)
       if (!response || !response.ok) {
         await new Promise((r) => setTimeout(r, 1500))
-        response = await fetch("/api/teams", { cache: "no-store" })
+        response = await fetch(url, { cache: "no-store" })
       }
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
@@ -96,7 +198,21 @@ export default function AdminPage() {
     } finally {
       setIsLoadingTeams(false)
     }
-  }, [])
+  }, [viewRegion])
+
+  // Load the edition list once signed in, and start on the live one.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    fetch("/api/regions", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!data) return
+        setRegions(data.regions ?? [])
+        setActiveRegion(data.active ?? "")
+        setViewRegion((current) => current || data.active || "")
+      })
+      .catch(() => toast.error("Could not load the region list"))
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -112,9 +228,12 @@ export default function AdminPage() {
       setTotalRevenue(0)
       return
     }
+    if (!viewRegion) return
     const fetchRevenue = async () => {
       try {
-        const response = await fetch("/api/payments", { cache: "no-store" })
+        const response = await fetch(`/api/payments?region=${encodeURIComponent(viewRegion)}`, {
+          cache: "no-store",
+        })
         if (!response.ok) {
           console.error("Failed to fetch revenue data")
           return
@@ -130,7 +249,7 @@ export default function AdminPage() {
       }
     }
     fetchRevenue()
-  }, [isAuthenticated])
+  }, [isAuthenticated, viewRegion])
 
   const totalParticipants = useMemo(
     () => teams.reduce((sum, team) => sum + (team.participants?.length ?? 0), 0),
@@ -153,7 +272,7 @@ export default function AdminPage() {
   }).format(totalRevenue)
 
   const stats = [
-    { label: "Total Votes", value: totalVotes },
+    { label: viewRegion === "all" ? "Total Votes (all regions)" : "Total Votes", value: totalVotes },
     { label: "Teams", value: teams.length },
     { label: "Poets", value: totalParticipants },
     {
@@ -179,28 +298,85 @@ export default function AdminPage() {
         <Card className="bg-white border-border/40 backdrop-blur w-full max-w-md shadow-2xl animate-fade-in-up">
           <CardHeader className="text-center">
             <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-6 h-6 text-primary-foreground" />
+              {loginStep === "otp" ? (
+                <ShieldCheck className="w-6 h-6 text-primary-foreground" />
+              ) : (
+                <Lock className="w-6 h-6 text-primary-foreground" />
+              )}
             </div>
-            <CardTitle className="text-foreground">Admin Login</CardTitle>
-            <CardDescription>Enter admin password to access the dashboard</CardDescription>
+            <CardTitle className="text-foreground">
+              {loginStep === "otp" ? "Verify It's You" : "Admin Login"}
+            </CardTitle>
+            <CardDescription>
+              {loginStep === "otp"
+                ? `Enter the 6-digit code sent to ${otpSentTo}`
+                : "Enter admin password to access the dashboard"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Input
-              type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              className="bg-input border-border/40 text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-colors"
-            />
-            <Button
-              onClick={handleLogin}
-              disabled={isLoginLoading}
-              className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300"
-            >
-              {isLoginLoading ? <Spinner size="sm" className="mr-2" /> : null}
-              Login
-            </Button>
+            {loginStep === "password" ? (
+              <>
+                <Input
+                  type="password"
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                  className="bg-input border-border/40 text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-colors"
+                />
+                <Button
+                  onClick={handleLogin}
+                  disabled={isLoginLoading}
+                  className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300"
+                >
+                  {isLoginLoading ? <Spinner size="sm" className="mr-2" /> : null}
+                  Login
+                </Button>
+              </>
+            ) : (
+              <>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  onKeyDown={(e) => e.key === "Enter" && handleVerifyOtp()}
+                  className="bg-input border-border/40 text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-colors text-center text-2xl tracking-[0.5em] font-mono"
+                />
+                <Button
+                  onClick={handleVerifyOtp}
+                  disabled={isLoginLoading}
+                  className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 transition-all duration-300"
+                >
+                  {isLoginLoading ? <Spinner size="sm" className="mr-2" /> : null}
+                  Verify & Login
+                </Button>
+                <div className="flex items-center justify-between text-sm">
+                  <button
+                    type="button"
+                    onClick={resetLogin}
+                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ArrowLeft className="w-3 h-3" />
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={resendIn > 0 || isLoginLoading}
+                    className="text-primary hover:underline disabled:text-muted-foreground disabled:no-underline"
+                  >
+                    {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  The code expires in 10 minutes. Check your spam folder if it hasn&apos;t arrived.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -220,6 +396,15 @@ export default function AdminPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            {regions.length > 0 && (
+              <AdminRegionSwitcher
+                regions={regions}
+                value={viewRegion}
+                onChange={setViewRegion}
+                activeRegion={activeRegion}
+                disabled={isLoadingTeams}
+              />
+            )}
             <Button
               variant="secondary"
               size="sm"
@@ -283,7 +468,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        <AdminReport />
+        <AdminReport region={viewRegion} />
 
         <Tabs defaultValue="results" className="space-y-6 w-full">
           <div className="w-full">
@@ -310,8 +495,8 @@ export default function AdminPage() {
           </div>
 
           <TabsContent value="results" className="animate-fade-in-up">
-            <AdminStageManager />
-            <AdminVotingResults teams={teams} isLoading={isLoadingTeams} />
+            <AdminStageManager region={viewRegion} />
+            <AdminVotingResults teams={teams} isLoading={isLoadingTeams} region={viewRegion} />
           </TabsContent>
 
           <TabsContent value="charts" className="animate-fade-in-up">
@@ -319,16 +504,21 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="teams" className="animate-fade-in-up">
-            <AdminTeamManager teams={teams} isLoading={isLoadingTeams} onRefresh={fetchTeams} />
+            <AdminTeamManager teams={teams} isLoading={isLoadingTeams} region={viewRegion} onRefresh={fetchTeams} />
           </TabsContent>
           <TabsContent value="voters" className="animate-fade-in-up">
-            <AdminVoterLog />
+            <AdminVoterLog region={viewRegion} />
           </TabsContent>
           <TabsContent value="revenue" className="animate-fade-in-up">
-            <AdminRevenue />
+            <AdminRevenue region={viewRegion} />
           </TabsContent>
           <TabsContent value="settings" className="animate-fade-in-up">
-            <AdminSettings />
+            <AdminSettings
+              region={viewRegion}
+              regions={regions}
+              activeRegion={activeRegion}
+              onActiveRegionChange={setActiveRegion}
+            />
           </TabsContent>
         </Tabs>
       </div>

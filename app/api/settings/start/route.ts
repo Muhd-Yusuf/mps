@@ -1,23 +1,25 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
-import { connectToDatabase, SettingModel } from "@/lib/mongodb"
 import { requireAdmin } from "@/lib/auth"
+import { regionFromRequest, regionForWrite } from "@/lib/regions"
+import { readRegionSetting, writeRegionSetting } from "@/lib/settings"
 
 const START_KEY = "voting_start"
 
-// When voting OPENS, stored as an ISO timestamp; empty string means voting is
-// open immediately (no scheduled start). The cast route enforces it server-side
-// and the landing page shows a live "Voting starts in…" countdown.
+// When voting OPENS for this region, stored as an ISO timestamp; empty string
+// means voting is open immediately (no scheduled start). The cast route enforces
+// it server-side and the landing page shows a live "Voting starts in…" countdown.
 const startSchema = z.object({
   start: z.union([z.string().datetime({ offset: true }), z.literal(""), z.null()]),
+  region: z.string().optional(),
 })
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    await connectToDatabase()
-    const setting = await SettingModel.findOne({ key: START_KEY }).lean()
-    return NextResponse.json({ start: setting?.value || null })
+    const region = await regionFromRequest(request)
+    const value = await readRegionSetting(region, START_KEY)
+    return NextResponse.json({ start: value || null, region })
   } catch (error) {
     console.error("[GET_START_ERROR]", error)
     return NextResponse.json({ error: "Failed to fetch voting start" }, { status: 500 })
@@ -37,12 +39,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid start time — send an ISO date-time or empty to clear" }, { status: 400 })
     }
 
-    await connectToDatabase()
-
+    const region = await regionForWrite(request, parsed.data.region)
     const value = parsed.data.start || ""
-    await SettingModel.findOneAndUpdate({ key: START_KEY }, { value }, { upsert: true })
+    await writeRegionSetting(region, START_KEY, value)
 
-    return NextResponse.json({ start: value || null })
+    return NextResponse.json({ start: value || null, region })
   } catch (error) {
     console.error("[UPDATE_START_ERROR]", error)
     return NextResponse.json({ error: "Failed to update voting start" }, { status: 500 })

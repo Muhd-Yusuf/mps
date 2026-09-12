@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Spinner } from "@/components/ui/spinner"
 import { Edit, Save } from "lucide-react"
 
-export default function AdminStageManager() {
+export default function AdminStageManager({ region }: { region: string }) {
   const { toast } = useToast()
   const [stage, setStage] = useState("")
   const [editingValue, setEditingValue] = useState("")
@@ -20,7 +20,7 @@ export default function AdminStageManager() {
     const fetchStage = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch("/api/settings/stage")
+        const response = await fetch(`/api/settings/stage?region=${encodeURIComponent(region)}`)
         if (!response.ok) throw new Error("Failed to fetch stage")
         const data = await response.json()
         setStage(data.stage)
@@ -41,7 +41,7 @@ export default function AdminStageManager() {
   const handleSave = async () => {
     try {
       setIsSaving(true)
-      const response = await fetch("/api/settings/stage", {
+      const response = await fetch(`/api/settings/stage?region=${encodeURIComponent(region)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value: editingValue }),

@@ -66,6 +66,9 @@ const teamSchema = new Schema(
     // Sequential "objective" voting: only the currently-open team accepts votes.
     votingOpen: { type: Boolean, default: false },
     order: { type: Number, default: 0 },
+    // Which regional edition this team belongs to (see lib/regions.ts). Teams
+    // created before regions existed are Bauchi's.
+    region: { type: String, trim: true, default: "bauchi", index: true },
   },
   { timestamps: true }
 )
@@ -85,6 +88,9 @@ const ticketSchema = new Schema(
     // The competition round this ticket was bought for. One ticket per email per
     // round, and a ticket can only be used to vote while that round is current.
     round: { type: Number },
+    // The regional edition this code was bought for — a Kaduna code can never
+    // be used to vote in Nasarawa, and revenue reports scope by it.
+    region: { type: String, trim: true, default: "bauchi", index: true },
     paidAt: { type: Date },
     paymentMetadata: { type: Schema.Types.Mixed },
   },
@@ -100,6 +106,12 @@ const voteSchema = new Schema(
     ticketId: { type: Schema.Types.ObjectId, ref: "Ticket", required: true },
     participantId: { type: String, required: true },
     teamId: { type: String, required: true },
+    // The round this vote was cast in. The cast route has always sent this, but
+    // it was missing from the schema, so mongoose's strict mode silently dropped
+    // it — which is why older votes have no round for the Voter Log to group by.
+    round: { type: Number },
+    // The regional edition this vote belongs to.
+    region: { type: String, trim: true, default: "bauchi", index: true },
   },
   { timestamps: true }
 )

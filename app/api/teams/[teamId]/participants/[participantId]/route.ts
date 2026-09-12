@@ -3,10 +3,15 @@ import { isValidObjectId, Types } from "mongoose"
 import { z } from "zod"
 
 import { connectToDatabase, TeamModel } from "@/lib/mongodb"
+import { getRegion, DEFAULT_REGION } from "@/lib/regions"
 import { requireAdmin } from "@/lib/auth"
 
 const patchSchema = z.object({
   inDanger: z.boolean().optional(),
+  // Set or replace a poet's portrait. Poets added by hand (rather than through
+  // the contestant import) arrive with no photo, and a poet must never be shown
+  // by name alone — this is how the admin fills that gap.
+  image: z.union([z.string().url("Photo must be a valid URL"), z.literal("")]).optional(),
   // Move the poet to another team (used when coaches pick their teams at the
   // Blind Audition). Votes, photo and danger flag travel with the poet.
   toTeamId: z.string().optional(),
@@ -53,6 +58,18 @@ export async function PATCH(
         return NextResponse.json({ error: "Team not found" }, { status: 404 })
       }
 
+      // Editions are independent: moving a poet between them would detach them
+      // from their own region's vote history. Promoting finalists into the
+      // Abuja edition is a deliberate, separate flow — not an accidental drag.
+      const sourceRegion = sourceTeam.region || DEFAULT_REGION
+      const targetRegion = targetTeam.region || DEFAULT_REGION
+      if (sourceRegion !== targetRegion) {
+        return NextResponse.json(
+          { error: `Cannot move a poet from the ${getRegion(sourceRegion).short} edition into ${getRegion(targetRegion).short}` },
+          { status: 400 }
+        )
+      }
+
       const participant = sourceTeam.participants?.find((p: any) => p._id.toString() === participantId)
       if (!participant) {
         return NextResponse.json({ error: "Participant not found" }, { status: 404 })
@@ -82,6 +99,9 @@ export async function PATCH(
     const update: Record<string, unknown> = {}
     if (parsed.data.inDanger !== undefined) {
       update["participants.$.inDanger"] = parsed.data.inDanger
+    }
+    if (parsed.data.image !== undefined) {
+      update["participants.$.image"] = parsed.data.image
     }
 
     if (!Object.keys(update).length) {

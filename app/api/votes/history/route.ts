@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth"
 import { connectToDatabase, TeamModel, VoteModel, SettingModel } from "@/lib/mongodb"
 import { authOptions } from "@/lib/auth"
 import { getPreset } from "@/lib/stages"
+import { regionFromRequest, regionFilter, ALL_REGIONS } from "@/lib/regions"
+import { regionSettingKey } from "@/lib/settings"
 
 // Admin-only history of past stages, computed from the immutable vote records.
 // GET            -> { rounds: [{ round, votes, stageName?, finalizedAt?, advanced? }] }
@@ -17,13 +19,22 @@ export async function GET(request: Request) {
 
     await connectToDatabase()
 
+    const region = await regionFromRequest(request)
+    const scope = regionFilter(region)
+    // Finalization markers are namespaced per region; "all" keeps the legacy
+    // un-namespaced ones in view too.
+    const markerPattern =
+      region === ALL_REGIONS
+        ? /stage_finalized_round_/
+        : new RegExp(`^(${regionSettingKey(region, "")})?stage_finalized_round_`)
     const [roundGroups, markers, teams] = await Promise.all([
       VoteModel.aggregate([
+        { $match: scope },
         { $group: { _id: "$round", votes: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
-      SettingModel.find({ key: /^stage_finalized_round_/ }).lean(),
-      TeamModel.find().lean(),
+      SettingModel.find({ key: markerPattern }).lean(),
+      TeamModel.find(scope).lean(),
     ])
 
     const markerByRound = new Map<number, any>()
@@ -55,7 +66,12 @@ export async function GET(request: Request) {
     }
 
     const round = roundParam === "legacy" ? null : parseInt(roundParam, 10)
-    const match = round == null ? { round: { $in: [null, undefined] } } : { round }
+    // Scoped to the edition being viewed: Kaduna round 1 and Bauchi round 1 are
+    // different stages and must never be summed into one result table.
+    const match = {
+      ...scope,
+      ...(round == null ? { round: { $in: [null, undefined] } } : { round }),
+    }
     const grouped = await VoteModel.aggregate([
       { $match: match },
       { $group: { _id: "$participantId", votes: { $sum: 1 } } },
@@ -63,10 +79,11 @@ export async function GET(request: Request) {
     ])
 
     // Resolve poets wherever they live NOW (teams, Revived, Eliminated).
-    const poetById = new Map<string, { name: string; team: string; originTeam?: string }>()
+    // Carry the portrait through: a poet is never listed by name alone.
+    const poetById = new Map<string, { name: string; team: string; originTeam?: string; image?: string }>()
     for (const t of teams) {
       for (const p of t.participants ?? []) {
-        poetById.set(p._id.toString(), { name: p.name, team: t.name, originTeam: p.originTeam })
+        poetById.set(p._id.toString(), { name: p.name, team: t.name, originTeam: p.originTeam, image: p.image })
       }
     }
     const advancedNames = new Set<string>(
@@ -78,6 +95,7 @@ export async function GET(request: Request) {
       return {
         name: poet?.name ?? "(poet no longer in system)",
         team: poet ? poet.originTeam || poet.team : "—",
+        image: poet?.image ?? "",
         votes: g.votes,
         advanced: poet ? advancedNames.has(poet.name) : false,
       }

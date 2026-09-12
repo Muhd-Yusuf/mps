@@ -642,16 +642,27 @@ export default function VotePage() {
                   <div className="space-y-3">
                     <h4 className="font-semibold text-foreground text-sm">Selected Poet:</h4>
                     {selectedParticipant ? (
-                      <div className="text-sm text-muted-foreground flex items-center gap-2">
+                      <div className="text-sm text-muted-foreground flex items-center gap-2.5">
+                        {/* A poet is never named without their face — the voter
+                            confirms who they picked, not just a name. */}
                         <div
-                          className="w-2 h-2 rounded-full"
+                          className="relative w-9 h-9 rounded-full overflow-hidden shrink-0 ring-2"
                           style={{
-                            backgroundColor:
+                            // @ts-expect-error -- CSS custom property for the ring colour
+                            "--tw-ring-color":
                               mode === "danger"
                                 ? preset.accentColor
                                 : teams.find((t) => t.id === selections[0]?.teamId)?.color ?? preset.accentColor,
                           }}
-                        />
+                        >
+                          <Image
+                            src={selectedParticipant.image || "/placeholder.svg"}
+                            alt={selectedParticipant.name}
+                            fill
+                            sizes="36px"
+                            className="object-cover"
+                          />
+                        </div>
                         <span className="font-medium text-foreground">{selectedParticipant.name}</span>
                       </div>
                     ) : (

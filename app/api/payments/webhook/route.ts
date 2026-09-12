@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import crypto from "crypto"
 
 import { connectToDatabase, TicketModel } from "@/lib/mongodb"
+import { regionFilter, DEFAULT_REGION } from "@/lib/regions"
 import { sendEmail, createVotingCodeEmailTemplate, createVotingCodeEmailText } from "@/lib/brevo"
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
@@ -58,6 +59,9 @@ export async function POST(request: Request) {
                     _id: { $ne: ticket._id },
                     email: ticket.email,
                     isPaid: true,
+                    // Scoped to this ticket's edition — a paid Bauchi code must not block
+                    // the same buyer from getting their Kaduna one.
+                    ...regionFilter(ticket.region || DEFAULT_REGION),
                     ...(ticket.round != null ? { round: ticket.round } : {}),
                 })
                 if (duplicatePaid) {

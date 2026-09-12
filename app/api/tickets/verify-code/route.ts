@@ -3,6 +3,7 @@ import { z } from "zod"
 
 import { connectToDatabase, TicketModel } from "@/lib/mongodb"
 import { validateVotingCode } from "@/lib/code-utils"
+import { getActiveRegion, getRegion, DEFAULT_REGION } from "@/lib/regions"
 
 const verifySchema = z.object({
   code: z.string().min(1, "Voting code is required"),
@@ -33,6 +34,17 @@ export async function POST(request: Request) {
 
     if (!ticket.isPaid) {
       return NextResponse.json({ error: "Ticket payment not completed" }, { status: 400 })
+    }
+
+    // Reject a code from another edition here rather than letting the voter pick
+    // a poet first and only fail at the last step.
+    const activeRegion = await getActiveRegion()
+    const ticketRegion = ticket.region || DEFAULT_REGION
+    if (ticketRegion !== activeRegion) {
+      return NextResponse.json(
+        { error: `This code was bought for the ${getRegion(ticketRegion).short} edition and cannot be used here` },
+        { status: 400 }
+      )
     }
 
     return NextResponse.json({
