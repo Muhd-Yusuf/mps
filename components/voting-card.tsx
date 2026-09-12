@@ -1,5 +1,6 @@
 "use client"
 
+import PoetAvatar from "@/components/poet-avatar"
 import type { Participant } from "@/lib/types"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -36,11 +37,11 @@ export default function VotingCard({ participant, isSelected, onSelect, teamColo
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3 flex-1">
               <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-primary/20">
-                <Image
-                  src={participant.image || "/placeholder.svg"}
-                  alt={participant.name}
-                  fill
-                  className="object-cover"
+                <PoetAvatar
+                  src={participant.image}
+                  name={participant.name}
+                  textClassName="text-xs"
+                  sizes="40px"
                 />
               </div>
               <h4 className="font-semibold text-foreground text-lg">{participant.name}</h4>
