@@ -8,6 +8,10 @@ import { requireAdmin } from "@/lib/auth"
 
 const patchSchema = z.object({
   inDanger: z.boolean().optional(),
+  // Set or replace a poet's portrait. Poets added by hand (rather than through
+  // the contestant import) arrive with no photo, and a poet must never be shown
+  // by name alone — this is how the admin fills that gap.
+  image: z.union([z.string().url("Photo must be a valid URL"), z.literal("")]).optional(),
   // Move the poet to another team (used when coaches pick their teams at the
   // Blind Audition). Votes, photo and danger flag travel with the poet.
   toTeamId: z.string().optional(),
@@ -95,6 +99,9 @@ export async function PATCH(
     const update: Record<string, unknown> = {}
     if (parsed.data.inDanger !== undefined) {
       update["participants.$.inDanger"] = parsed.data.inDanger
+    }
+    if (parsed.data.image !== undefined) {
+      update["participants.$.image"] = parsed.data.image
     }
 
     if (!Object.keys(update).length) {
