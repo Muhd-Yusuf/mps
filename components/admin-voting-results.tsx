@@ -1,5 +1,6 @@
 "use client"
 
+import PoetAvatar from "@/components/poet-avatar"
 import { useEffect, useState } from "react"
 import Image from "next/image"
 
@@ -68,7 +69,7 @@ function RankedList({
                   {rankOf ? rankOf(poet) : index + 1}
                 </span>
                 <div className="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-border/40">
-                  <Image src={poet.image || placeholderImage} alt={poet.name} fill className="object-cover" />
+                  <PoetAvatar src={poet.image} name={poet.name} textClassName="text-xs" />
                 </div>
                 <span className="font-medium text-foreground truncate">{poet.name}</span>
                 {!hideTeamLabel && (
@@ -240,7 +241,7 @@ export default function AdminVotingResults({ teams, isLoading, region }: AdminVo
                           {index + 1}
                         </span>
                         <div className="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-border/40">
-                          <Image src={r.image || placeholderImage} alt={r.name} fill className="object-cover" />
+                          <PoetAvatar src={r.image} name={r.name} textClassName="text-[10px]" />
                         </div>
                         <span className="font-medium text-foreground truncate">{r.name}</span>
                         <span className="text-xs text-muted-foreground truncate hidden sm:inline">{r.team}</span>

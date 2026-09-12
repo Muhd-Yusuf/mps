@@ -1,5 +1,6 @@
 "use client"
 
+import PoetAvatar from "@/components/poet-avatar"
 import { useEffect, useMemo, useState } from "react"
 import { Search, Download, Users, FileText } from "lucide-react"
 import { toast } from "sonner"
@@ -291,7 +292,7 @@ export default function AdminVoterLog({ region }: { region: string }) {
                       <TableCell className="font-medium text-foreground">
                         <span className="flex items-center gap-2.5">
                           <span className="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-border/40">
-                            <Image src={r.poetImage || "/placeholder.svg"} alt={r.poet} fill className="object-cover" />
+                            <PoetAvatar src={r.poetImage} name={r.poet} textClassName="text-[10px]" />
                           </span>
                           <span className="truncate">{r.poet}</span>
                         </span>

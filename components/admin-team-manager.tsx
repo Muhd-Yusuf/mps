@@ -1,5 +1,6 @@
 "use client"
 
+import PoetAvatar from "@/components/poet-avatar"
 import { useMemo, useState } from "react"
 import Image from "next/image"
 import { Plus, UserPlus, Trash2, Edit2, Radio, Flame, ArrowRightLeft, Search, ImagePlus } from "lucide-react"
@@ -1095,12 +1096,7 @@ export default function AdminTeamManager({ teams, isLoading, region, onRefresh }
                     <div key={participant.id} className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
                       <div className="flex flex-1 items-center gap-3">
                         <div className="relative h-10 w-10 overflow-hidden rounded-full border border-border/40">
-                        <Image
-                            src={participant.image || placeholderImage}
-                          alt={participant.name}
-                          fill
-                          className="object-cover"
-                        />
+                        <PoetAvatar src={participant.image} name={participant.name} textClassName="text-xs" />
                       </div>
                       <div>
                         <p className="font-medium text-foreground">{participant.name}</p>
@@ -1166,12 +1162,7 @@ export default function AdminTeamManager({ teams, isLoading, region, onRefresh }
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel className="flex items-center gap-2">
                                 <span className="relative h-6 w-6 overflow-hidden rounded-full border border-border/40 shrink-0">
-                                  <Image
-                                    src={participant.image || placeholderImage}
-                                    alt={participant.name}
-                                    fill
-                                    className="object-cover"
-                                  />
+                                  <PoetAvatar src={participant.image} name={participant.name} textClassName="text-[9px]" />
                                 </span>
                                 <span className="truncate">Assign {participant.name} to…</span>
                               </DropdownMenuLabel>
