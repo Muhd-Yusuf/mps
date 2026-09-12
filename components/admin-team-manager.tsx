@@ -1164,7 +1164,17 @@ export default function AdminTeamManager({ teams, isLoading, region, onRefresh }
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Assign {participant.name} to…</DropdownMenuLabel>
+                              <DropdownMenuLabel className="flex items-center gap-2">
+                                <span className="relative h-6 w-6 overflow-hidden rounded-full border border-border/40 shrink-0">
+                                  <Image
+                                    src={participant.image || placeholderImage}
+                                    alt={participant.name}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                </span>
+                                <span className="truncate">Assign {participant.name} to…</span>
+                              </DropdownMenuLabel>
                               {teams
                                 .filter((t) => t.id !== team.id)
                                 .map((t) => (
