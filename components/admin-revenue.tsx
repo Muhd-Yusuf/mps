@@ -227,9 +227,10 @@ export default function AdminRevenue({ region }: { region: string }) {
       autoTable(doc, {
         startY: 30,
         margin: { top: 28 },
-        head: [["Email", "Voting Code", "Amount", "Voted?", "Purchased"]],
+        head: [["Email", "Phone", "Voting Code", "Amount", "Voted?", "Purchased"]],
         body: filtered.map((t) => [
           t.email,
+          t.phone ?? "",
           t.votingCode,
           naira(t.amount),
           t.hasVoted ? "Yes" : "No",
@@ -351,6 +352,7 @@ export default function AdminRevenue({ region }: { region: string }) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Voting Code</TableHead>
                   <TableHead>Date</TableHead>
@@ -362,6 +364,15 @@ export default function AdminRevenue({ region }: { region: string }) {
                 {currentTickets.map((ticket) => (
                   <TableRow key={ticket.id}>
                     <TableCell>{ticket.email}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {ticket.phone ? (
+                        <a href={`tel:${ticket.phone}`} className="text-primary hover:underline">
+                          {ticket.phone}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>{naira(ticket.amount)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{ticket.votingCode}</Badge>
@@ -448,8 +459,11 @@ export default function AdminRevenue({ region }: { region: string }) {
           <DialogHeader>
             <DialogTitle>Vote on their behalf</DialogTitle>
             <DialogDescription>
-              Recording {proxyTicket?.email}&apos;s vote using code{" "}
-              <span className="font-mono font-semibold">{proxyTicket?.votingCode}</span>
+              Recording {proxyTicket?.email}&apos;s vote
+              {proxyTicket?.phone ? (
+                <> (<a href={`tel:${proxyTicket.phone}`} className="text-primary hover:underline">{proxyTicket.phone}</a>)</>
+              ) : null}{" "}
+              using code <span className="font-mono font-semibold">{proxyTicket?.votingCode}</span>
               {proxyStage ? <> in the <strong>{proxyStage}</strong> stage</> : null}. This spends their code
               permanently, is recorded as cast by an admin, and emails them a confirmation naming the poet.
             </DialogDescription>

@@ -7,6 +7,7 @@ function serializeTicket(ticket: any) {
   return {
     id: ticket._id.toString(),
     email: ticket.email,
+    phone: ticket.phone ?? "",
     votingCode: ticket.votingCode,
     amount: ticket.amount,
     isPaid: ticket.isPaid,

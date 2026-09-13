@@ -80,6 +80,10 @@ export const TeamModel: Model<TeamDocument> = mongoose.models.Team || mongoose.m
 const ticketSchema = new Schema(
   {
     email: { type: String, required: true, trim: true, lowercase: true },
+    // How the buyer can be reached — needed when someone rings in about a code
+    // they couldn't use. Optional on the model: tickets sold before this field
+    // existed have none.
+    phone: { type: String, trim: true },
     votingCode: { type: String, required: true, unique: true, trim: true, uppercase: true },
     amount: { type: Number, required: true },
     isPaid: { type: Boolean, default: false },

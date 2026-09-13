@@ -14,6 +14,7 @@ import { Spinner } from "@/components/ui/spinner"
 
 type LedgerRow = {
   email: string
+  phone?: string
   votingCode: string
   poet: string
   poetImage?: string
@@ -98,7 +99,8 @@ export default function AdminVoterLog({ region }: { region: string }) {
       if (!q) return true
       return (
         r.email.toLowerCase().includes(q) ||
-        r.poet.toLowerCase().includes(q) ||
+        (r.phone ?? "").includes(q) ||
+      r.poet.toLowerCase().includes(q) ||
       (r.adminNote ?? "").toLowerCase().includes(q) ||
         r.team.toLowerCase().includes(q) ||
         r.votingCode.toLowerCase().includes(q)
@@ -114,9 +116,9 @@ export default function AdminVoterLog({ region }: { region: string }) {
 
   const downloadCsv = () => {
     const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
-    const lines = [`MPS Media Poetry Challenge — Voter Log — ${stageLabel}`, "", "Email,Voting Code,Voted For,Photo,Team,When,Cast By,Reason"]
+    const lines = [`MPS Media Poetry Challenge — Voter Log — ${stageLabel}`, "", "Email,Phone,Voting Code,Voted For,Photo,Team,When,Cast By,Reason"]
     filtered.forEach((r) =>
-      lines.push([r.email, r.votingCode, r.poet, r.poetImage ?? "", r.team, new Date(r.at).toLocaleString(), r.castByAdmin ? "Admin (on behalf)" : "Voter", r.adminNote ?? ""].map((x) => esc(String(x))).join(","))
+      lines.push([r.email, r.phone ?? "", r.votingCode, r.poet, r.poetImage ?? "", r.team, new Date(r.at).toLocaleString(), r.castByAdmin ? "Admin (on behalf)" : "Voter", r.adminNote ?? ""].map((x) => esc(String(x))).join(","))
     )
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
@@ -155,15 +157,16 @@ export default function AdminVoterLog({ region }: { region: string }) {
       autoTable(doc, {
         startY: 30,
         margin: { top: 28 },
-        head: [["Email", "Code", "Photo", "Voted For", "Team", "When", "Cast By"]],
-        body: filtered.map((r) => [r.email, r.votingCode, "", r.poet, r.team, new Date(r.at).toLocaleString(), r.castByAdmin ? "Admin (on behalf)" : "Voter"]),
+        head: [["Email", "Phone", "Code", "Photo", "Voted For", "Team", "When", "Cast By"]],
+        body: filtered.map((r) => [r.email, r.phone ?? "", r.votingCode, "", r.poet, r.team, new Date(r.at).toLocaleString(), r.castByAdmin ? "Admin (on behalf)" : "Voter"]),
         styles: { fontSize: 8, cellPadding: 2, minCellHeight: 9, valign: "middle" },
-        columnStyles: { 2: { cellWidth: 10 } },
+        columnStyles: { 3: { cellWidth: 10 } },
         headStyles: { fillColor: [118, 75, 162] },
         theme: "striped",
         didDrawPage: (d: any) => drawHeader(d.pageNumber),
         didDrawCell: (hook: any) => {
-          if (hook.section !== "body" || hook.column.index !== 2) return
+          // Photo is column 3: Email, Phone, Code, Photo, ...
+          if (hook.section !== "body" || hook.column.index !== 3) return
           const src = filtered[hook.row.index]?.poetImage
           const data64 = src ? portraits.get(src) : null
           if (!data64) return
@@ -251,7 +254,7 @@ export default function AdminVoterLog({ region }: { region: string }) {
                 setSearch(e.target.value)
                 setPage(1)
               }}
-              placeholder="Search by email, poet, team or code…"
+              placeholder="Search by email, phone, poet, team or code…"
               className="pl-9"
             />
           </div>
