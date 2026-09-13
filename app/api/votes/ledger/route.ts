@@ -85,6 +85,7 @@ export async function GET(request: Request) {
       return {
         email: ticket?.email ?? "(unknown ticket)",
         votingCode: ticket?.votingCode ?? "—",
+        phone: ticket?.phone ?? "",
         poet: poet?.name ?? "(poet removed)",
         poetImage: poet?.image ?? "",
         castByAdmin: Boolean((v as any).castByAdmin),

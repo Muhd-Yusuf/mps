@@ -7,8 +7,16 @@ import { generateVotingCode } from "@/lib/code-utils"
 import { getActiveRegion, regionFilter } from "@/lib/regions"
 import { readRegionSetting, readRegionNumber } from "@/lib/settings"
 
+// Digits only, 7-15, optionally +-prefixed — permissive enough for any Nigerian
+// or international format a buyer might type, strict enough to catch typos.
+const phoneSchema = z
+  .string()
+  .trim()
+  .refine((v) => /^\+?\d{7,15}$/.test(v.replace(/[\s()-]/g, "")), "Enter a valid phone number")
+
 const initializeSchema = z.object({
   email: z.string().email("Invalid email address"),
+  phone: phoneSchema,
   // Accepted for backwards compatibility but IGNORED — the price is fixed
   // server-side so nobody can tamper with the amount in the browser.
   amount: z.number().optional(),
@@ -171,6 +179,7 @@ export async function POST(request: Request) {
       isPaid: false,
       round,
       region,
+      phone: parsed.data.phone.replace(/[\s()-]/g, ""),
     })
 
     // Initialize Paystack payment. The post-payment redirect goes back to the
