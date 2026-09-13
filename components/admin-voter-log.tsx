@@ -17,6 +17,8 @@ type LedgerRow = {
   votingCode: string
   poet: string
   poetImage?: string
+  castByAdmin?: boolean
+  adminNote?: string
   team: string
   stageKey: string
   at: string
@@ -97,6 +99,7 @@ export default function AdminVoterLog({ region }: { region: string }) {
       return (
         r.email.toLowerCase().includes(q) ||
         r.poet.toLowerCase().includes(q) ||
+      (r.adminNote ?? "").toLowerCase().includes(q) ||
         r.team.toLowerCase().includes(q) ||
         r.votingCode.toLowerCase().includes(q)
       )
@@ -111,9 +114,9 @@ export default function AdminVoterLog({ region }: { region: string }) {
 
   const downloadCsv = () => {
     const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
-    const lines = [`MPS Media Poetry Challenge — Voter Log — ${stageLabel}`, "", "Email,Voting Code,Voted For,Photo,Team,When"]
+    const lines = [`MPS Media Poetry Challenge — Voter Log — ${stageLabel}`, "", "Email,Voting Code,Voted For,Photo,Team,When,Cast By,Reason"]
     filtered.forEach((r) =>
-      lines.push([r.email, r.votingCode, r.poet, r.poetImage ?? "", r.team, new Date(r.at).toLocaleString()].map((x) => esc(String(x))).join(","))
+      lines.push([r.email, r.votingCode, r.poet, r.poetImage ?? "", r.team, new Date(r.at).toLocaleString(), r.castByAdmin ? "Admin (on behalf)" : "Voter", r.adminNote ?? ""].map((x) => esc(String(x))).join(","))
     )
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
@@ -152,8 +155,8 @@ export default function AdminVoterLog({ region }: { region: string }) {
       autoTable(doc, {
         startY: 30,
         margin: { top: 28 },
-        head: [["Email", "Code", "Photo", "Voted For", "Team", "When"]],
-        body: filtered.map((r) => [r.email, r.votingCode, "", r.poet, r.team, new Date(r.at).toLocaleString()]),
+        head: [["Email", "Code", "Photo", "Voted For", "Team", "When", "Cast By"]],
+        body: filtered.map((r) => [r.email, r.votingCode, "", r.poet, r.team, new Date(r.at).toLocaleString(), r.castByAdmin ? "Admin (on behalf)" : "Voter"]),
         styles: { fontSize: 8, cellPadding: 2, minCellHeight: 9, valign: "middle" },
         columnStyles: { 2: { cellWidth: 10 } },
         headStyles: { fillColor: [118, 75, 162] },
@@ -295,6 +298,14 @@ export default function AdminVoterLog({ region }: { region: string }) {
                             <PoetAvatar src={r.poetImage} name={r.poet} textClassName="text-[10px]" />
                           </span>
                           <span className="truncate">{r.poet}</span>
+                          {r.castByAdmin && (
+                            <span
+                              className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap"
+                              title={r.adminNote ? `Cast by admin — ${r.adminNote}` : "Cast by admin on the buyer's behalf"}
+                            >
+                              BY ADMIN
+                            </span>
+                          )}
                         </span>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{r.team}</TableCell>

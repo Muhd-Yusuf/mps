@@ -112,6 +112,12 @@ const voteSchema = new Schema(
     round: { type: Number },
     // The regional edition this vote belongs to.
     region: { type: String, trim: true, default: "bauchi", index: true },
+    // Cast by an admin on a buyer's behalf, after voting closed, at the buyer's
+    // request. Permanently distinguishable from a vote the buyer cast, so any
+    // later dispute about a result can be answered from the record.
+    castByAdmin: { type: Boolean, default: false },
+    // Why it was cast on their behalf — required at the point of casting.
+    adminNote: { type: String, trim: true },
   },
   { timestamps: true }
 )

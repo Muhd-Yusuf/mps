@@ -209,6 +209,110 @@ Didn't try to log in? Someone else knows the admin password. Ignore this code an
   `.trim()
 }
 
+export function createProxyVoteEmailTemplate(
+  poetName: string,
+  votingCode: string,
+  castAt: string,
+  appUrl?: string
+): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Vote Has Been Recorded</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f5f5; padding: 20px;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">MPS Media Poetry Challenge</h1>
+              <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">Vote Confirmation</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 20px; color: #1a1a1a; font-size: 24px; font-weight: 600;">Your vote has been recorded \u2705</h2>
+
+              <p style="margin: 0 0 20px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
+                As you requested, our team cast your vote on your behalf because voting had already
+                closed by the time you were able to reach us. Here is exactly what was recorded.
+              </p>
+
+              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0;">
+                <p style="margin: 0 0 10px; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">You Voted For</p>
+                <p style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">${poetName}</p>
+              </div>
+
+              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr>
+                  <td style="padding: 10px 0; color: #666666; font-size: 14px; border-bottom: 1px solid #eeeeee;">Voting code</td>
+                  <td style="padding: 10px 0; color: #1a1a1a; font-size: 14px; font-weight: 600; text-align: right; font-family: 'Courier New', monospace; border-bottom: 1px solid #eeeeee;">${votingCode}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 0; color: #666666; font-size: 14px; border-bottom: 1px solid #eeeeee;">Recorded at</td>
+                  <td style="padding: 10px 0; color: #1a1a1a; font-size: 14px; font-weight: 600; text-align: right; border-bottom: 1px solid #eeeeee;">${castAt}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 0; color: #666666; font-size: 14px;">Cast by</td>
+                  <td style="padding: 10px 0; color: #1a1a1a; font-size: 14px; font-weight: 600; text-align: right;">MPS Media, on your behalf</td>
+                </tr>
+              </table>
+
+              <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e5e5;">
+                <p style="margin: 0 0 10px; color: #666666; font-size: 14px; line-height: 1.6;">
+                  <strong>Your code has now been used</strong> and cannot be used again. Each voting code counts once.
+                </p>
+                <p style="margin: 0; color: #b91c1c; font-size: 14px; line-height: 1.6;">
+                  <strong>Didn't ask for this?</strong> If you did not request that we vote on your behalf,
+                  reply to this email immediately so we can investigate.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 30px 40px; text-align: center; background-color: #f9f9f9; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0; color: #999999; font-size: 12px;">
+                \u00a9 ${new Date().getFullYear()} MPS Media Poetry Challenge. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}
+
+export function createProxyVoteEmailText(poetName: string, votingCode: string, castAt: string): string {
+  return `
+MPS Media Poetry Challenge - Vote Confirmation
+
+Your vote has been recorded.
+
+As you requested, our team cast your vote on your behalf because voting had already closed by the time you were able to reach us. Here is exactly what was recorded:
+
+You voted for : ${poetName}
+Voting code   : ${votingCode}
+Recorded at   : ${castAt}
+Cast by       : MPS Media, on your behalf
+
+Your code has now been used and cannot be used again. Each voting code counts once.
+
+Didn't ask for this? If you did not request that we vote on your behalf, reply to this email immediately so we can investigate.
+
+\u00a9 ${new Date().getFullYear()} MPS Media Poetry Challenge. All rights reserved.
+  `.trim()
+}
+
 export function createVotingCodeEmailText(votingCode: string, appUrl?: string): string {
   const voteUrl = appUrl ? `${appUrl}/vote` : "/vote"
 

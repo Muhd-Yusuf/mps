@@ -87,6 +87,8 @@ export async function GET(request: Request) {
         votingCode: ticket?.votingCode ?? "—",
         poet: poet?.name ?? "(poet removed)",
         poetImage: poet?.image ?? "",
+        castByAdmin: Boolean((v as any).castByAdmin),
+        adminNote: (v as any).adminNote ?? "",
         team: poet ? poet.origin || poet.team : "—",
         stageKey: stageOf.get(v._id.toString()) ?? "session-0",
         at: v.createdAt?.toISOString?.() ?? v.createdAt,
