@@ -80,6 +80,10 @@ export const TeamModel: Model<TeamDocument> = mongoose.models.Team || mongoose.m
 const ticketSchema = new Schema(
   {
     email: { type: String, required: true, trim: true, lowercase: true },
+    // How the buyer can be reached — needed when someone rings in about a code
+    // they couldn't use. Optional on the model: tickets sold before this field
+    // existed have none.
+    phone: { type: String, trim: true },
     votingCode: { type: String, required: true, unique: true, trim: true, uppercase: true },
     amount: { type: Number, required: true },
     isPaid: { type: Boolean, default: false },
@@ -112,6 +116,12 @@ const voteSchema = new Schema(
     round: { type: Number },
     // The regional edition this vote belongs to.
     region: { type: String, trim: true, default: "bauchi", index: true },
+    // Cast by an admin on a buyer's behalf, after voting closed, at the buyer's
+    // request. Permanently distinguishable from a vote the buyer cast, so any
+    // later dispute about a result can be answered from the record.
+    castByAdmin: { type: Boolean, default: false },
+    // Why it was cast on their behalf — required at the point of casting.
+    adminNote: { type: String, trim: true },
   },
   { timestamps: true }
 )

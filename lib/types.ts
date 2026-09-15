@@ -42,6 +42,7 @@ export type VoteSelection = {
 }[]
 
 export interface Ticket {
+  phone?: string
   id: string;
   email: string;
   votingCode: string;

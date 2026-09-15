@@ -1,5 +1,6 @@
 "use client"
 
+import PoetAvatar from "@/components/poet-avatar"
 import { useState, useEffect, useCallback } from "react"
 import type { VoteSelection, Team, Participant } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -655,12 +656,11 @@ export default function VotePage() {
                                 : teams.find((t) => t.id === selections[0]?.teamId)?.color ?? preset.accentColor,
                           }}
                         >
-                          <Image
-                            src={selectedParticipant.image || "/placeholder.svg"}
-                            alt={selectedParticipant.name}
-                            fill
+                          <PoetAvatar
+                            src={selectedParticipant.image}
+                            name={selectedParticipant.name}
+                            textClassName="text-xs"
                             sizes="36px"
-                            className="object-cover"
                           />
                         </div>
                         <span className="font-medium text-foreground">{selectedParticipant.name}</span>

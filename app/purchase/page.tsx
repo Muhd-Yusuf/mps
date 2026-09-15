@@ -14,6 +14,7 @@ const TICKET_PRICE = 2000
 export default function PurchasePage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState("")
 
@@ -28,6 +29,18 @@ export default function PurchasePage() {
       return
     }
 
+    // Permissive on purpose — accept any sensible Nigerian or international
+    // format; the server applies the same rule.
+    const digits = phone.replace(/[\s()-]/g, "")
+    if (!digits) {
+      setError("Please enter your phone number")
+      return
+    }
+    if (!/^\+?\d{7,15}$/.test(digits)) {
+      setError("Please enter a valid phone number")
+      return
+    }
+
     try {
       setIsProcessing(true)
       setError("")
@@ -38,6 +51,7 @@ export default function PurchasePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
+          phone: phone.trim(),
           amount: TICKET_PRICE,
         }),
       })
@@ -108,6 +122,22 @@ export default function PurchasePage() {
               <p className="text-xs text-muted-foreground mt-2">Your voting code will be sent to this email</p>
             </div>
 
+            {/* Phone — how we reach you if there's a problem with your code */}
+            <div>
+              <Input
+                type="tel"
+                inputMode="tel"
+                placeholder="080 1234 5678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={isProcessing}
+                className="bg-input border-border/40 text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-colors"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                So we can reach you if there&apos;s any problem with your voting code
+              </p>
+            </div>
+
             {/* Pricing */}
             <div className="bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20 rounded-xl p-6">
               <h4 className="font-semibold text-foreground mb-4">Package Details</h4>
@@ -134,7 +164,7 @@ export default function PurchasePage() {
             {/* Payment Button */}
             <Button
               onClick={handlePayment}
-              disabled={isProcessing || !email.trim()}
+              disabled={isProcessing || !email.trim() || !phone.trim()}
               className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg hover:shadow-primary/20 disabled:opacity-50 transition-all duration-300 group"
               size="lg"
             >

@@ -1,5 +1,6 @@
 "use client"
 
+import PoetAvatar from "@/components/poet-avatar"
 import { useEffect, useMemo, useState } from "react"
 import { Search, Download, Users, FileText } from "lucide-react"
 import { toast } from "sonner"
@@ -13,9 +14,12 @@ import { Spinner } from "@/components/ui/spinner"
 
 type LedgerRow = {
   email: string
+  phone?: string
   votingCode: string
   poet: string
   poetImage?: string
+  castByAdmin?: boolean
+  adminNote?: string
   team: string
   stageKey: string
   at: string
@@ -95,7 +99,9 @@ export default function AdminVoterLog({ region }: { region: string }) {
       if (!q) return true
       return (
         r.email.toLowerCase().includes(q) ||
-        r.poet.toLowerCase().includes(q) ||
+        (r.phone ?? "").includes(q) ||
+      r.poet.toLowerCase().includes(q) ||
+      (r.adminNote ?? "").toLowerCase().includes(q) ||
         r.team.toLowerCase().includes(q) ||
         r.votingCode.toLowerCase().includes(q)
       )
@@ -110,9 +116,9 @@ export default function AdminVoterLog({ region }: { region: string }) {
 
   const downloadCsv = () => {
     const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
-    const lines = [`MPS Media Poetry Challenge — Voter Log — ${stageLabel}`, "", "Email,Voting Code,Voted For,Photo,Team,When"]
+    const lines = [`MPS Media Poetry Challenge — Voter Log — ${stageLabel}`, "", "Email,Phone,Voting Code,Voted For,Photo,Team,When,Cast By,Reason"]
     filtered.forEach((r) =>
-      lines.push([r.email, r.votingCode, r.poet, r.poetImage ?? "", r.team, new Date(r.at).toLocaleString()].map((x) => esc(String(x))).join(","))
+      lines.push([r.email, r.phone ?? "", r.votingCode, r.poet, r.poetImage ?? "", r.team, new Date(r.at).toLocaleString(), r.castByAdmin ? "Admin (on behalf)" : "Voter", r.adminNote ?? ""].map((x) => esc(String(x))).join(","))
     )
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
@@ -151,15 +157,16 @@ export default function AdminVoterLog({ region }: { region: string }) {
       autoTable(doc, {
         startY: 30,
         margin: { top: 28 },
-        head: [["Email", "Code", "Photo", "Voted For", "Team", "When"]],
-        body: filtered.map((r) => [r.email, r.votingCode, "", r.poet, r.team, new Date(r.at).toLocaleString()]),
+        head: [["Email", "Phone", "Code", "Photo", "Voted For", "Team", "When", "Cast By"]],
+        body: filtered.map((r) => [r.email, r.phone ?? "", r.votingCode, "", r.poet, r.team, new Date(r.at).toLocaleString(), r.castByAdmin ? "Admin (on behalf)" : "Voter"]),
         styles: { fontSize: 8, cellPadding: 2, minCellHeight: 9, valign: "middle" },
-        columnStyles: { 2: { cellWidth: 10 } },
+        columnStyles: { 3: { cellWidth: 10 } },
         headStyles: { fillColor: [118, 75, 162] },
         theme: "striped",
         didDrawPage: (d: any) => drawHeader(d.pageNumber),
         didDrawCell: (hook: any) => {
-          if (hook.section !== "body" || hook.column.index !== 2) return
+          // Photo is column 3: Email, Phone, Code, Photo, ...
+          if (hook.section !== "body" || hook.column.index !== 3) return
           const src = filtered[hook.row.index]?.poetImage
           const data64 = src ? portraits.get(src) : null
           if (!data64) return
@@ -247,7 +254,7 @@ export default function AdminVoterLog({ region }: { region: string }) {
                 setSearch(e.target.value)
                 setPage(1)
               }}
-              placeholder="Search by email, poet, team or code…"
+              placeholder="Search by email, phone, poet, team or code…"
               className="pl-9"
             />
           </div>
@@ -291,9 +298,17 @@ export default function AdminVoterLog({ region }: { region: string }) {
                       <TableCell className="font-medium text-foreground">
                         <span className="flex items-center gap-2.5">
                           <span className="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-border/40">
-                            <Image src={r.poetImage || "/placeholder.svg"} alt={r.poet} fill className="object-cover" />
+                            <PoetAvatar src={r.poetImage} name={r.poet} textClassName="text-[10px]" />
                           </span>
                           <span className="truncate">{r.poet}</span>
+                          {r.castByAdmin && (
+                            <span
+                              className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap"
+                              title={r.adminNote ? `Cast by admin — ${r.adminNote}` : "Cast by admin on the buyer's behalf"}
+                            >
+                              BY ADMIN
+                            </span>
+                          )}
                         </span>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{r.team}</TableCell>
