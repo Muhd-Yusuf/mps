@@ -110,6 +110,7 @@ export default function PurchasePage() {
               <label className="block text-sm font-semibold text-foreground mb-3">Email Address</label>
               <Input
                 type="email"
+                required
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) => {
@@ -124,9 +125,11 @@ export default function PurchasePage() {
 
             {/* Phone — how we reach you if there's a problem with your code */}
             <div>
+              <label className="block text-sm font-semibold text-foreground mb-3">Phone Number</label>
               <Input
                 type="tel"
                 inputMode="tel"
+                required
                 placeholder="080 1234 5678"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -134,7 +137,7 @@ export default function PurchasePage() {
                 className="bg-input border-border/40 text-foreground placeholder:text-muted-foreground focus:border-primary/50 transition-colors"
               />
               <p className="text-xs text-muted-foreground mt-2">
-                So we can reach you if there&apos;s any problem with your voting code
+                Required — so we can reach you if there&apos;s any problem with your voting code
               </p>
             </div>
 
